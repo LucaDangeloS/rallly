@@ -3,6 +3,7 @@ import { Trans } from "react-i18next/TransWithoutContext";
 
 import { EmailLayout } from "../components/email-layout";
 import { borderColor, Heading, Text } from "../components/styled-components";
+import { createEmailTemplate } from "../create-email-template";
 import type { EmailContext } from "../types";
 
 export interface EventCanceledEmailProps {
@@ -40,10 +41,8 @@ const EventCanceledEmail = ({
       </Heading>
       <Text>
         <Trans
-          i18n={ctx.i18n}
-          t={ctx.t}
+          {...ctx.i18nProps}
           i18nKey="eventCanceledContent"
-          ns="emails"
           defaults="<b>{hostName}</b> has canceled <b>{title}</b> that was scheduled for:"
           values={{ hostName, title }}
           components={{
@@ -93,15 +92,14 @@ const EventCanceledEmail = ({
   );
 };
 
-EventCanceledEmail.getSubject = (
-  props: EventCanceledEmailProps,
-  ctx: EmailContext,
-) => {
-  return ctx.t("eventCanceledSubject", {
-    defaultValue: "Canceled: {title}",
-    title: props.title,
-    ns: "emails",
-  });
-};
-
 export { EventCanceledEmail };
+
+export const sendEventCanceledEmail = createEmailTemplate({
+  component: EventCanceledEmail,
+  subject: (props, ctx) =>
+    ctx.t("eventCanceledSubject", {
+      defaultValue: "Canceled: {title}",
+      title: props.title,
+      ns: "emails",
+    }),
+});

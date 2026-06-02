@@ -8,6 +8,7 @@ import {
   Heading,
   Text,
 } from "../components/styled-components";
+import { createEmailTemplate } from "../create-email-template";
 import type { EmailContext } from "../types";
 
 export interface FinalizeHostEmailProps {
@@ -50,10 +51,8 @@ const FinalizeHostEmail = ({
       </Heading>
       <Text>
         <Trans
-          i18n={ctx.i18n}
-          t={ctx.t}
+          {...ctx.i18nProps}
           i18nKey="finalizeHost_content"
-          ns="emails"
           values={{ title }}
           components={{
             b: <strong />,
@@ -118,15 +117,14 @@ const FinalizeHostEmail = ({
   );
 };
 
-FinalizeHostEmail.getSubject = (
-  props: FinalizeHostEmailProps,
-  ctx: EmailContext,
-) => {
-  return ctx.t("finalizeHost_subject", {
-    defaultValue: "Date booked for {title}",
-    title: props.title,
-    ns: "emails",
-  });
-};
-
 export { FinalizeHostEmail };
+
+export const sendFinalizeHostEmail = createEmailTemplate({
+  component: FinalizeHostEmail,
+  subject: (props, ctx) =>
+    ctx.t("finalizeHost_subject", {
+      defaultValue: "Date booked for {title}",
+      title: props.title,
+      ns: "emails",
+    }),
+});

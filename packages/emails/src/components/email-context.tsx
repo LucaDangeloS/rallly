@@ -14,4 +14,11 @@ export const previewEmailContext: EmailContext = {
   i18n: i18nInstance,
   t: i18nInstance.getFixedT("en"),
   appName: "Rallly",
+  primaryColor: "#4f46e5",
+  hideAttribution: false,
+  i18nProps: {
+    i18n: i18nInstance,
+    t: i18nInstance.getFixedT("en"),
+    ns: "emails",
+  },
 };

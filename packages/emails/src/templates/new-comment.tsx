@@ -3,7 +3,7 @@ import { Trans } from "react-i18next/TransWithoutContext";
 import type { NotificationBaseProps } from "../components/notification-email";
 import NotificationEmail from "../components/notification-email";
 import { Heading, Text } from "../components/styled-components";
-import type { EmailContext } from "../types";
+import { createEmailTemplate } from "../create-email-template";
 
 export interface NewCommentEmailProps extends NotificationBaseProps {
   authorName: string;
@@ -29,16 +29,14 @@ const NewCommentEmail = ({
     >
       <Heading>
         <Trans
-          i18n={ctx.i18n}
-          ns="emails"
+          {...ctx.i18nProps}
           i18nKey="newComment_heading"
           defaults="New Comment"
         />
       </Heading>
       <Text>
         <Trans
-          i18n={ctx.i18n}
-          ns="emails"
+          {...ctx.i18nProps}
           i18nKey="newComment_content"
           defaults="<b>{authorName}</b> has commented on <b>{title}</b>."
           components={{
@@ -54,16 +52,15 @@ const NewCommentEmail = ({
   );
 };
 
-NewCommentEmail.getSubject = (
-  props: NewCommentEmailProps,
-  ctx: EmailContext,
-) => {
-  return ctx.t("newComment_subject", {
-    ns: "emails",
-    defaultValue: "{authorName} has commented on {title}",
-    authorName: props.authorName,
-    title: props.title,
-  });
-};
-
 export { NewCommentEmail };
+
+export const sendNewCommentEmail = createEmailTemplate({
+  component: NewCommentEmail,
+  subject: (props, ctx) =>
+    ctx.t("newComment_subject", {
+      ns: "emails",
+      defaultValue: "{authorName} has commented on {title}",
+      authorName: props.authorName,
+      title: props.title,
+    }),
+});

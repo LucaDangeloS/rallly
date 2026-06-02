@@ -8,6 +8,7 @@ import {
   Heading,
   Text,
 } from "../components/styled-components";
+import { createEmailTemplate } from "../create-email-template";
 import type { EmailContext } from "../types";
 
 export interface FinalizeParticipantEmailProps {
@@ -47,10 +48,8 @@ const FinalizeParticipantEmail = ({
       </Heading>
       <Text>
         <Trans
-          i18n={ctx.i18n}
-          t={ctx.t}
+          {...ctx.i18nProps}
           i18nKey="finalizeParticipant_content"
-          ns="emails"
           defaults="<b>{hostName}</b> has booked <b>{title}</b> for the following date:"
           values={{ hostName, title }}
           components={{
@@ -105,8 +104,7 @@ const FinalizeParticipantEmail = ({
       <Section style={{ marginTop: 32 }}>
         <Button href={pollUrl} color={ctx.primaryColor}>
           <Trans
-            t={ctx.t}
-            ns="emails"
+            {...ctx.i18nProps}
             i18nKey="finalizeHost_button"
             defaults="View Event"
           />
@@ -116,15 +114,14 @@ const FinalizeParticipantEmail = ({
   );
 };
 
-FinalizeParticipantEmail.getSubject = (
-  props: FinalizeParticipantEmailProps,
-  ctx: EmailContext,
-) => {
-  return ctx.t("finalizeParticipant_subject", {
-    defaultValue: "Date booked for {title}",
-    title: props.title,
-    ns: "emails",
-  });
-};
-
 export { FinalizeParticipantEmail };
+
+export const sendFinalizeParticipantEmail = createEmailTemplate({
+  component: FinalizeParticipantEmail,
+  subject: (props, ctx) =>
+    ctx.t("finalizeParticipant_subject", {
+      defaultValue: "Date booked for {title}",
+      title: props.title,
+      ns: "emails",
+    }),
+});

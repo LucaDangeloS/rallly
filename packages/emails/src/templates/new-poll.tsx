@@ -8,6 +8,7 @@ import {
   Link,
   Text,
 } from "../components/styled-components";
+import { createEmailTemplate } from "../create-email-template";
 import type { EmailContext } from "../types";
 
 export interface NewPollEmailProps {
@@ -41,10 +42,8 @@ export const NewPollEmail = ({
       </Heading>
       <Text>
         <Trans
-          i18n={ctx.i18n}
-          t={ctx.t}
+          {...ctx.i18nProps}
           i18nKey="newPoll_content"
-          ns="emails"
           values={{ title }}
           components={{
             b: <strong />,
@@ -69,12 +68,12 @@ export const NewPollEmail = ({
   );
 };
 
-NewPollEmail.getSubject = (props: NewPollEmailProps, ctx: EmailContext) => {
-  return ctx.t("newPoll_subject", {
-    defaultValue: "Let's find a date for {title}!",
-    title: props.title,
-    ns: "emails",
-  });
-};
-
-export default NewPollEmail;
+export const sendNewPollEmail = createEmailTemplate({
+  component: NewPollEmail,
+  subject: (props, ctx) =>
+    ctx.t("newPoll_subject", {
+      defaultValue: "Let's find a date for {title}!",
+      title: props.title,
+      ns: "emails",
+    }),
+});
