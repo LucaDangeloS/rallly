@@ -8,7 +8,7 @@ import type * as React from "react";
 import { cn } from "./lib/utils";
 
 const avatarVariants = cva(
-  "group/avatar relative flex shrink-0 select-none after:absolute after:inset-0 after:rounded-[inherit] after:border after:border-border after:mix-blend-darken dark:after:mix-blend-lighten",
+  "group/avatar relative flex shrink-0 select-none overflow-hidden bg-muted",
   {
     variants: {
       size: {
@@ -21,6 +21,10 @@ const avatarVariants = cva(
         circle: "rounded-full",
         square: "",
       },
+      bordered: {
+        true: "after:absolute after:inset-0 after:rounded-[inherit] after:border after:border-border after:mix-blend-darken dark:after:mix-blend-lighten",
+        false: "",
+      },
     },
     compoundVariants: [
       { shape: "square", size: "sm", className: "rounded-md" },
@@ -31,6 +35,7 @@ const avatarVariants = cva(
     defaultVariants: {
       size: "default",
       shape: "circle",
+      bordered: true,
     },
   },
 );
@@ -39,6 +44,7 @@ function Avatar({
   className,
   size = "default",
   shape = "circle",
+  bordered = true,
   ...props
 }: AvatarPrimitive.Root.Props & VariantProps<typeof avatarVariants>) {
   return (
@@ -46,7 +52,7 @@ function Avatar({
       data-slot="avatar"
       data-size={size}
       data-shape={shape}
-      className={cn(avatarVariants({ size, shape }), className)}
+      className={cn(avatarVariants({ size, shape, bordered }), className)}
       {...props}
     />
   );
@@ -57,7 +63,7 @@ function AvatarImage({ className, ...props }: AvatarPrimitive.Image.Props) {
     <AvatarPrimitive.Image
       data-slot="avatar-image"
       className={cn(
-        "aspect-square size-full rounded-[inherit] object-cover",
+        "absolute inset-0 size-full rounded-[inherit] object-cover opacity-100 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0",
         className,
       )}
       {...props}
@@ -73,7 +79,7 @@ function AvatarFallback({
     <AvatarPrimitive.Fallback
       data-slot="avatar-fallback"
       className={cn(
-        "flex size-full items-center justify-center rounded-[inherit] bg-muted text-muted-foreground text-xs group-data-[size=sm]/avatar:text-[0.625rem]",
+        "flex size-full items-center justify-center rounded-[inherit] bg-muted text-muted-foreground text-xs group-data-[size=lg]/avatar:text-sm group-data-[size=sm]/avatar:text-[0.625rem] group-data-[size=xl]/avatar:text-base",
         className,
       )}
       {...props}

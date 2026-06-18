@@ -245,7 +245,6 @@ export const polls = router({
           status: poll.status,
           is_guest: ctx.user.isGuest,
           created_at: poll.createdAt,
-          participant_count: 0,
           comment_count: 0,
           option_count: poll.options.length,
           has_location: !!location,
@@ -551,17 +550,6 @@ export const polls = router({
         groupKey: input.pollId,
         properties: {
           muted: input.muted,
-        },
-      });
-
-      posthog()?.capture({
-        event: "poll_notification_toggle",
-        distinctId: ctx.user.id,
-        properties: {
-          muted: input.muted,
-        },
-        groups: {
-          poll: input.pollId,
         },
       });
     }),

@@ -11,6 +11,7 @@ import { getInstanceBranding, getSpaceBranding } from "@/emails/branding";
 import { posthog } from "@/features/analytics/posthog";
 import { getNotificationRecipient } from "@/features/notifications/queries";
 import { hasPollAdminAccess } from "@/features/poll/query";
+import { getGravatarUrl } from "@/utils/gravatar";
 import {
   createRateLimitMiddleware,
   publicProcedure,
@@ -35,7 +36,7 @@ function createParticipantFullDTO(
   const { votes, user, ...rest } = participant;
   return {
     ...rest,
-    image: user?.image ?? null,
+    image: user?.image ?? getGravatarUrl(rest.email),
     votes,
     hidden: false,
   };
@@ -345,21 +346,11 @@ export const participants = router({
           }),
         );
 
-        posthog()?.groupIdentify({
-          groupType: "poll",
-          groupKey: pollId,
-          properties: {
-            participant_count: totalResponses,
-          },
-        });
-
-        // Track participant addition analytics
         posthog()?.capture({
           distinctId: ctx.user.id,
           event: "poll_response_submit",
           properties: {
             participant_id: participant.id,
-            participant_name: participant.name,
             has_email: !!email,
             total_responses: totalResponses,
           },

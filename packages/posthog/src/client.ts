@@ -1,10 +1,8 @@
 "use client";
 import posthog from "posthog-js";
-import type React from "react";
 
-export { useFeatureFlagEnabled, usePostHog } from "posthog-js/react";
+export { useFeatureFlagEnabled } from "posthog-js/react";
 
-import { PostHogProvider as BasePostHogProvider } from "posthog-js/react";
 import { isGlobalPrivacyControlEnabled } from "./utils";
 
 if (typeof window !== "undefined" && process.env.NEXT_PUBLIC_POSTHOG_API_KEY) {
@@ -21,11 +19,10 @@ if (typeof window !== "undefined" && process.env.NEXT_PUBLIC_POSTHOG_API_KEY) {
     autocapture: false,
     opt_out_capturing_by_default: isGlobalPrivacyControlEnabled(),
     cross_subdomain_cookie: true,
+    capture_performance: {
+      web_vitals: false,
+    },
   });
-}
-
-export function PostHogProvider({ children }: { children: React.ReactNode }) {
-  return <BasePostHogProvider client={posthog}>{children}</BasePostHogProvider>;
 }
 
 export { posthog };
