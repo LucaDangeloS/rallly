@@ -2,7 +2,12 @@ import type { TimeFormat } from "@rallly/database";
 
 export type DateInput = Date | string | number;
 
-export type DatePreset = "date" | "dateLong" | "weekday";
+export type DatePreset =
+  | "date"
+  | "dateLong"
+  | "dateFull"
+  | "weekday"
+  | "monthYear";
 
 export type DateTimePreset = DatePreset | "time" | "datetime";
 
@@ -67,8 +72,17 @@ function presetOptions(
         month: "long",
         day: "numeric",
       };
+    case "dateFull":
+      return {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      };
     case "weekday":
       return { weekday: "long" };
+    case "monthYear":
+      return { month: "long", year: "numeric" };
     case "datetime":
       return {
         year: "numeric",
@@ -109,6 +123,76 @@ export function formatDate(
     locale: options.locale,
     timeZone: "UTC",
   });
+}
+
+export type DateParts = {
+  weekday: string;
+  day: string;
+  month: string;
+  year: string;
+};
+
+const partsFormatters = new Map<string, Intl.DateTimeFormat>();
+
+/**
+ * Decomposed short parts for chip-style UI (dow/day/month/year columns).
+ * One formatToParts call keeps the parts consistent with each other instead
+ * of running parallel formatters.
+ */
+export function formatDateParts(
+  value: DateInput,
+  options: { locale: string; timeZone?: string },
+): DateParts {
+  const key = `${options.locale}|${options.timeZone ?? ""}`;
+  let f = partsFormatters.get(key);
+  if (!f) {
+    f = new Intl.DateTimeFormat(options.locale, {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      // An empty string is an invalid IANA zone and throws; treat it as "unset".
+      timeZone: options.timeZone || undefined,
+    });
+    partsFormatters.set(key, f);
+  }
+
+  const parts: DateParts = { weekday: "", day: "", month: "", year: "" };
+  for (const part of f.formatToParts(toDate(value))) {
+    if (part.type in parts) {
+      parts[part.type as keyof DateParts] = part.value;
+    }
+  }
+  return parts;
+}
+
+type DurationFormatCtor = new (
+  locale: string | undefined,
+  options: { style: "narrow" },
+) => { format(duration: { hours?: number; minutes?: number }): string };
+
+const durationFormatters = new Map<string, InstanceType<DurationFormatCtor>>();
+
+export function formatDuration(minutes: number, locale: string): string {
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  const DurationFormat = (Intl as { DurationFormat?: DurationFormatCtor })
+    .DurationFormat;
+  if (DurationFormat) {
+    let formatter = durationFormatters.get(locale);
+    if (!formatter) {
+      formatter = new DurationFormat(locale, { style: "narrow" });
+      durationFormatters.set(locale, formatter);
+    }
+    return formatter.format({ hours, minutes: mins });
+  }
+  if (hours && mins) {
+    return `${hours}h ${mins}m`;
+  }
+  if (hours) {
+    return `${hours}h`;
+  }
+  return `${mins}m`;
 }
 
 const relativeFormatters = new Map<string, Intl.RelativeTimeFormat>();
