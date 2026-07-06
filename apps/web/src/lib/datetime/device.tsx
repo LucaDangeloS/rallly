@@ -1,6 +1,5 @@
 "use client";
 
-import type { TimeFormat } from "@rallly/database";
 import Cookies from "js-cookie";
 import React from "react";
 import { DateTimeProvider } from "@/lib/datetime/client";
@@ -9,6 +8,7 @@ import {
   TIME_ZONE_COOKIE_NAME,
   TIME_ZONE_OVERRIDE_COOKIE_NAME,
 } from "@/lib/datetime/constants";
+import type { TimeFormat } from "@/lib/datetime/schema";
 
 const cookieAttributes = {
   path: "/",
@@ -51,11 +51,13 @@ const DeviceDateTimeContext = React.createContext<DeviceDateTime | null>(null);
  * getDeviceDateTimeConfig.
  */
 export function DeviceDateTimeProvider({
+  locale,
   timeZone: initialTimeZone,
   timeFormat: initialTimeFormat,
   weekStart,
   children,
 }: {
+  locale: string;
   timeZone?: string;
   timeFormat?: TimeFormat;
   weekStart?: number;
@@ -81,6 +83,7 @@ export function DeviceDateTimeProvider({
   return (
     <DeviceDateTimeContext.Provider value={value}>
       <DateTimeProvider
+        locale={locale}
         timeZone={timeZone}
         timeFormat={timeFormat}
         weekStart={weekStart}

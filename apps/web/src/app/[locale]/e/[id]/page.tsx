@@ -12,7 +12,7 @@ import LogoMarkGray from "@/assets/logo-mark-gray.svg";
 import { OptimizedAvatarImage } from "@/components/optimized-avatar-image";
 import TruncatedLinkify from "@/components/poll/truncated-linkify";
 import { SessionRefresher } from "@/components/session-refresher";
-import { BrandingStyle } from "@/features/branding/branding-style";
+import { BrandStyle } from "@/features/branding/brand-style";
 import { formatLocationText } from "@/features/location/utils";
 import {
   EventCalendarCard,
@@ -29,6 +29,7 @@ import {
 import { getSpaceBranding } from "@/features/space/data";
 import { getUserProfile } from "@/features/user/data";
 import { getTranslation } from "@/i18n/server";
+import { getLocale } from "@/i18n/server/get-locale";
 import { getSession } from "@/lib/auth";
 import { DeviceDateTimeProvider } from "@/lib/datetime/device";
 import { getDeviceDateTimeConfig } from "@/lib/datetime/server";
@@ -100,16 +101,20 @@ export default async function EventPage({
 
   const session = await getSession();
   const { t } = await getTranslation();
-  const deviceDateTimeConfig = await getDeviceDateTimeConfig();
+  const [locale, deviceDateTimeConfig] = await Promise.all([
+    getLocale(),
+    getDeviceDateTimeConfig(),
+  ]);
 
   return (
     <DeviceDateTimeProvider
+      locale={locale}
       timeZone={deviceDateTimeConfig.timeZone}
       timeFormat={deviceDateTimeConfig.timeFormat}
     >
       <div className="page-bg-gray-50 absolute inset-0 h-dvh overflow-auto md:h-dvh md:items-center md:justify-center md:p-5 dark:bg-gray-900">
         <SessionRefresher />
-        {brandingColor ? <BrandingStyle primaryColor={brandingColor} /> : null}
+        {brandingColor ? <BrandStyle primaryColor={brandingColor} /> : null}
         <header className="fixed top-0 right-0 left-0 z-10 flex justify-between p-4">
           <Link href="/">
             <LogoMarkGray className="size-8 text-muted-foreground" />

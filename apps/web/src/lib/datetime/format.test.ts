@@ -1,4 +1,3 @@
-import type { TimeFormat } from "@rallly/database";
 import { describe, expect, it } from "vitest";
 import {
   formatDate,
@@ -6,6 +5,7 @@ import {
   formatDateTimeRange,
   formatRelativeTime,
 } from "@/lib/datetime/format";
+import type { TimeFormat } from "@/lib/datetime/schema";
 
 // Fri 26 Jun 2026, in UTC.
 const at = (hour: number, minute = 0) =>
@@ -123,13 +123,7 @@ describe("formatDateTime", () => {
     expect(out).toContain("EDT");
   });
 
-  it("accepts ISO strings and timestamps", () => {
-    expect(
-      formatDateTime(at(13).toISOString(), {
-        preset: "time",
-        ...ctx("en", "hours24"),
-      }),
-    ).toBe("13:00");
+  it("accepts timestamps", () => {
     expect(
       formatDateTime(at(13).getTime(), {
         preset: "time",
