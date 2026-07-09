@@ -26,7 +26,7 @@ import {
   EmptyStateIcon,
   EmptyStateTitle,
 } from "@/components/empty-state";
-import type { NewEventData } from "@/components/forms";
+import type { NewEventData } from "@/components/forms/types";
 import { Trans, useTranslation } from "@/i18n/client";
 import { useDateTime, useDateTimeConfig } from "@/lib/datetime/client";
 import { formatDateParts } from "@/lib/datetime/format";
@@ -35,11 +35,10 @@ import {
   expectTimeOption,
   getBrowserTimeZone,
   removeAllOptionsForDay,
-} from "../../../../utils/date-time-utils";
+} from "@/lib/utils/date-time-utils";
 import DateCard from "../../../date-card";
 import { useHeadlessDatePicker } from "../../../headless-date-picker";
-import type { DateTimeOption } from "..";
-import type { DateTimePickerProps } from "../types";
+import type { DateTimeOption, DateTimePickerProps } from "../types";
 import { formatDateWithoutTime, formatDateWithoutTz } from "../utils";
 import TimePicker from "./time-picker";
 

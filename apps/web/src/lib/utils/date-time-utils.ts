@@ -1,9 +1,8 @@
-import { dayjs } from "@/lib/dayjs";
-
 import type {
   DateTimeOption,
   TimeOption,
-} from "../components/forms/poll-options-form";
+} from "@/components/forms/poll-options-form/types";
+import { dayjs } from "@/lib/dayjs";
 
 export function getBrowserTimeZone() {
   return dayjs.tz.guess();
@@ -37,6 +36,13 @@ export interface ParsedTimeSlotOption {
 }
 
 export type ParsedDateTimeOpton = ParsedDateOption | ParsedTimeSlotOption;
+
+export const getOptionDateTimeLabel = (option: ParsedDateTimeOpton) => {
+  const date = `${option.dow} ${option.day} ${option.month} ${option.year}`;
+  return option.type === "timeSlot"
+    ? `${date}, ${option.startTime} – ${option.endTime}`
+    : date;
+};
 
 export const removeAllOptionsForDay = (
   options: DateTimeOption[],

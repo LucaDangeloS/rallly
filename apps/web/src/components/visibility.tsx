@@ -4,8 +4,7 @@
 import React from "react";
 
 import { useParticipants } from "@/components/participants-provider";
-import { usePermissions } from "@/contexts/permissions";
-import { usePoll } from "@/contexts/poll";
+import { usePermissions, usePoll } from "@/features/poll/client";
 
 export const IfScoresVisible = (props: React.PropsWithChildren) => {
   const context = React.useContext(VisibilityContext);
@@ -26,6 +25,23 @@ const VisibilityContext = React.createContext<{
 }>({
   canSeeScores: true,
 });
+
+export const useVisibleParticipants = () => {
+  const { canSeeScores } = useVisibility();
+  const { canEditParticipant } = usePermissions();
+  const { participants } = useParticipants();
+
+  const filteredParticipants = React.useMemo(() => {
+    if (!canSeeScores) {
+      return participants.filter((participant) =>
+        canEditParticipant(participant.id),
+      );
+    }
+    return participants;
+  }, [canEditParticipant, canSeeScores, participants]);
+
+  return filteredParticipants;
+};
 
 export const VisibilityProvider = ({ children }: React.PropsWithChildren) => {
   const poll = usePoll();
