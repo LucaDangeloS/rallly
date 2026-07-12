@@ -80,15 +80,17 @@ function PollListItem({
         <div className="hidden items-center justify-end gap-4 sm:flex">
           {participants.length > 0 ? (
             <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="cursor-help text-muted-foreground text-sm">
-                  <Trans
-                    i18nKey="participantCount"
-                    defaults="{count, plural, =0 {No participants} =1 {1 participant} other {# participants}}"
-                    values={{ count: participants.length }}
-                  />
-                </span>
-              </TooltipTrigger>
+              <TooltipTrigger
+                render={
+                  <span className="cursor-help text-muted-foreground text-sm">
+                    <Trans
+                      i18nKey="participantCount"
+                      defaults="{count, plural, =0 {No participants} =1 {1 participant} other {# participants}}"
+                      values={{ count: participants.length }}
+                    />
+                  </span>
+                }
+              />
               <TooltipContent>
                 <ul>
                   {participants.slice(0, 10).map((participant) => (
@@ -206,10 +208,8 @@ function PollListItem({
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <DialogClose asChild>
-              <Button>
-                <Trans i18nKey="cancel" />
-              </Button>
+            <DialogClose render={<Button />}>
+              <Trans i18nKey="cancel" />
             </DialogClose>
             <Button
               variant="destructive"

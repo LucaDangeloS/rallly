@@ -82,15 +82,17 @@ export function ScheduledEventListItem({
               <div className="text-muted-foreground text-sm">
                 {invites.length > 0 ? (
                   <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="cursor-help">
-                        <Trans
-                          i18nKey="attendeeCount"
-                          defaults="{count, plural, =0 {No attendees} one {1 attendee} other {# attendees}}"
-                          values={{ count: invites.length }}
-                        />
-                      </span>
-                    </TooltipTrigger>
+                    <TooltipTrigger
+                      render={
+                        <span className="cursor-help">
+                          <Trans
+                            i18nKey="attendeeCount"
+                            defaults="{count, plural, =0 {No attendees} one {1 attendee} other {# attendees}}"
+                            values={{ count: invites.length }}
+                          />
+                        </span>
+                      }
+                    />
                     <TooltipContent>
                       <ul>
                         {invites.slice(0, 10).map((invite) => (
@@ -193,10 +195,8 @@ export function ScheduledEventListItem({
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="default">
-                <Trans i18nKey="cancel" defaults="Cancel" />
-              </Button>
+            <DialogClose render={<Button variant="default" />}>
+              <Trans i18nKey="cancel" defaults="Cancel" />
             </DialogClose>
             <Button
               variant="destructive"
