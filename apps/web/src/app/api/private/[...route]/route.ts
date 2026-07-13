@@ -1,4 +1,3 @@
-import { RedisStore } from "@hono-rate-limiter/redis";
 import type { SpaceTier } from "@rallly/database";
 import { prisma } from "@rallly/database";
 import { absoluteUrl, shortUrl } from "@rallly/utils/absolute-url";
@@ -11,10 +10,8 @@ import {
   resolver,
   validator,
 } from "hono-openapi";
-import { rateLimiter } from "hono-rate-limiter";
 import { getPollParticipants, getPollResults } from "@/features/poll/data";
 import { createPoll, deletePoll } from "@/features/poll/mutations";
-import { redis } from "@/lib/kv";
 import { isMaintenanceModeEnabled } from "@/lib/maintenance";
 import {
   createPollInputSchema,
@@ -27,12 +24,14 @@ import {
 } from "../schemas";
 import { spaceApiKeyAuth } from "../utils/api-key";
 import { apiError } from "../utils/poll";
+import { RATE_LIMIT_PER_MINUTE, rateLimit } from "../utils/rate-limit";
 import type { SlotGeneratorInput } from "../utils/time-slots";
 import {
   dedupeTimeSlots,
   generateTimeSlots,
   parseStartTime,
 } from "../utils/time-slots";
+import { wideEvent } from "../utils/wide-event";
 
 type Env = {
   Variables: {
@@ -46,6 +45,8 @@ type Env = {
 };
 
 const app = new Hono<Env>().basePath("/api/private");
+
+app.use("*", wideEvent);
 
 app.use("*", async (c, next) => {
   if (isMaintenanceModeEnabled()) {
@@ -70,6 +71,16 @@ const spaceNotProResponse = {
   },
 };
 
+const rateLimitExceededResponse = {
+  description:
+    "Rate limit exceeded. Includes a `Retry-After` header indicating how many seconds to wait before retrying.",
+  content: {
+    "application/json": {
+      schema: resolver(errorResponseSchema),
+    },
+  },
+};
+
 app.get(
   "/openapi",
   openAPIRouteHandler(app, {
@@ -77,6 +88,13 @@ app.get(
       info: {
         title: "Rallly Private API",
         version: "0.0.1",
+        description: [
+          "## Rate limits",
+          "",
+          `All endpoints share a single limit of **${RATE_LIMIT_PER_MINUTE} requests per minute per space**. The limit is per space, not per API key, so creating additional keys does not increase throughput.`,
+          "",
+          "Every response includes the standard `RateLimit-*` headers describing the current limit, remaining quota, and reset time. When the limit is exceeded the API responds with `429 Too Many Requests`, a `RATE_LIMIT_EXCEEDED` error body, and a `Retry-After` header indicating how many seconds to wait before retrying.",
+        ].join("\n"),
       },
       components: {
         securitySchemes: {
@@ -102,15 +120,7 @@ app.get(
 app.post(
   "/polls",
   spaceApiKeyAuth,
-  rateLimiter<Env>({
-    windowMs: 60 * 1000,
-    limit: 60,
-    keyGenerator: (c) => {
-      const { apiKeyId } = c.get("apiAuth");
-      return `private-api:polls-create:${apiKeyId}`;
-    },
-    store: redis ? new RedisStore({ client: redis }) : undefined,
-  }),
+  rateLimit,
   describeRoute({
     tags: ["Polls"],
     summary: "Create a poll",
@@ -135,6 +145,7 @@ app.post(
         },
       },
       403: spaceNotProResponse,
+      429: rateLimitExceededResponse,
     },
   }),
   validator("json", createPollInputSchema),
@@ -336,15 +347,7 @@ app.post(
 app.get(
   "/polls/:pollId",
   spaceApiKeyAuth,
-  rateLimiter<Env>({
-    windowMs: 60 * 1000,
-    limit: 120,
-    keyGenerator: (c) => {
-      const { apiKeyId } = c.get("apiAuth");
-      return `private-api:polls-get:${apiKeyId}`;
-    },
-    store: redis ? new RedisStore({ client: redis }) : undefined,
-  }),
+  rateLimit,
   describeRoute({
     tags: ["Polls"],
     summary: "Get a poll",
@@ -361,6 +364,7 @@ app.get(
         },
       },
       403: spaceNotProResponse,
+      429: rateLimitExceededResponse,
       404: {
         description: "Poll not found",
         content: {
@@ -448,15 +452,7 @@ app.get(
 app.get(
   "/polls/:pollId/results",
   spaceApiKeyAuth,
-  rateLimiter<Env>({
-    windowMs: 60 * 1000,
-    limit: 120,
-    keyGenerator: (c) => {
-      const { apiKeyId } = c.get("apiAuth");
-      return `private-api:polls-results:${apiKeyId}`;
-    },
-    store: redis ? new RedisStore({ client: redis }) : undefined,
-  }),
+  rateLimit,
   describeRoute({
     tags: ["Polls"],
     summary: "Get poll results",
@@ -473,6 +469,7 @@ app.get(
         },
       },
       403: spaceNotProResponse,
+      429: rateLimitExceededResponse,
       404: {
         description: "Poll not found",
         content: {
@@ -508,15 +505,7 @@ app.get(
 app.get(
   "/polls/:pollId/participants",
   spaceApiKeyAuth,
-  rateLimiter<Env>({
-    windowMs: 60 * 1000,
-    limit: 120,
-    keyGenerator: (c) => {
-      const { apiKeyId } = c.get("apiAuth");
-      return `private-api:polls-participants:${apiKeyId}`;
-    },
-    store: redis ? new RedisStore({ client: redis }) : undefined,
-  }),
+  rateLimit,
   describeRoute({
     tags: ["Polls"],
     summary: "Get poll participants",
@@ -533,6 +522,7 @@ app.get(
         },
       },
       403: spaceNotProResponse,
+      429: rateLimitExceededResponse,
       404: {
         description: "Poll not found",
         content: {
@@ -568,15 +558,7 @@ app.get(
 app.delete(
   "/polls/:pollId",
   spaceApiKeyAuth,
-  rateLimiter<Env>({
-    windowMs: 60 * 1000,
-    limit: 60,
-    keyGenerator: (c) => {
-      const { apiKeyId } = c.get("apiAuth");
-      return `private-api:polls-delete:${apiKeyId}`;
-    },
-    store: redis ? new RedisStore({ client: redis }) : undefined,
-  }),
+  rateLimit,
   describeRoute({
     tags: ["Polls"],
     summary: "Delete a poll",
@@ -593,6 +575,7 @@ app.delete(
         },
       },
       403: spaceNotProResponse,
+      429: rateLimitExceededResponse,
       404: {
         description: "Poll not found",
         content: {
