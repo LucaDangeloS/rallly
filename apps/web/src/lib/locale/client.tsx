@@ -1,55 +1,10 @@
 "use client";
-import { toast } from "@rallly/ui/sonner";
-import Cookies from "js-cookie";
-import { useParams, useRouter } from "next/navigation";
-import React from "react";
-import { useTranslation } from "@/i18n/client";
-import { LOCALE_COOKIE_NAME } from "@/lib/locale/constants";
-
-export function LocaleSync({ userLocale }: { userLocale?: string }) {
-  const { locale } = useLocale();
-  const router = useRouter();
-  const { t } = useTranslation();
-
-  React.useEffect(() => {
-    // update the cookie with the user locale if it's different from the current locale
-    if (userLocale && locale !== userLocale) {
-      setLocaleCookie(userLocale);
-      toast.info(
-        t("localeSyncToast", {
-          defaultValue: "Your language preferences changed",
-        }),
-        {
-          action: {
-            label: "Refresh",
-            onClick: () => {
-              router.refresh();
-            },
-          },
-        },
-      );
-    }
-  }, [locale, userLocale, router, t]);
-
-  return null;
-}
-
-export function setLocaleCookie(locale: string) {
-  Cookies.set(LOCALE_COOKIE_NAME, locale, {
-    path: "/",
-    domain: process.env.NEXT_PUBLIC_COOKIE_DOMAIN,
-  });
-}
+import { useParams } from "next/navigation";
 
 export function useLocale() {
   const { locale } = useParams();
-  const router = useRouter();
 
   return {
     locale: locale as string,
-    changeLocale: (locale: string) => {
-      setLocaleCookie(locale);
-      router.refresh();
-    },
   };
 }
