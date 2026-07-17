@@ -8,14 +8,14 @@ import * as z from "zod";
 import { getInstanceBranding } from "@/emails/branding";
 import { getNotificationRecipient } from "@/features/notifications/data";
 import { hasPollAdminAccess } from "@/features/poll/data";
-import { posthog } from "@/lib/posthog";
+import { track } from "@/lib/posthog";
 import {
   createRateLimitMiddleware,
   publicProcedure,
   requireUserMiddleware,
   router,
 } from "../../trpc";
-import { resolveUserId } from "./utils";
+import { resolveActor } from "./utils";
 
 const logger = createLogger("comments");
 
@@ -166,8 +166,7 @@ export const comments = router({
       }
 
       // Track comment addition analytics
-      posthog()?.capture({
-        distinctId: ctx.user.id,
+      track(ctx.user, {
         event: "poll_comment_add",
         properties: {
           is_guest: ctx.user.isGuest,
@@ -187,7 +186,7 @@ export const comments = router({
       }),
     )
     .mutation(async ({ input: { commentId, token }, ctx }) => {
-      const userId = await resolveUserId(token, ctx.user);
+      const actor = await resolveActor(token, ctx.user);
 
       const comment = await prisma.comment.findUnique({
         where: { id: commentId },
@@ -201,9 +200,9 @@ export const comments = router({
         });
       }
 
-      const isAuthor = comment.userId === userId;
+      const isAuthor = comment.userId === actor.id;
 
-      if (!isAuthor && !(await hasPollAdminAccess(comment.pollId, userId))) {
+      if (!isAuthor && !(await hasPollAdminAccess(comment.pollId, actor.id))) {
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "You are not allowed to delete this comment",
@@ -217,14 +216,11 @@ export const comments = router({
       });
 
       // Track comment deletion analytics
-      if (comment) {
-        posthog()?.capture({
-          distinctId: userId,
-          event: "poll_comment_delete",
-          groups: {
-            poll: comment.pollId,
-          },
-        });
-      }
+      track(actor, {
+        event: "poll_comment_delete",
+        groups: {
+          poll: comment.pollId,
+        },
+      });
     }),
 });

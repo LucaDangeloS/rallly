@@ -10,7 +10,7 @@ import * as z from "zod";
 import { getInstanceBranding, getSpaceBranding } from "@/emails/branding";
 import { getNotificationRecipient } from "@/features/notifications/data";
 import { hasPollAdminAccess } from "@/features/poll/data";
-import { posthog } from "@/lib/posthog";
+import { track } from "@/lib/posthog";
 import { getGravatarUrl } from "@/lib/utils/gravatar";
 import {
   createRateLimitMiddleware,
@@ -20,7 +20,7 @@ import {
 } from "../../trpc";
 import {
   createParticipantEditToken,
-  resolveUserId,
+  resolveActor,
   tryResolveUserId,
 } from "./utils";
 
@@ -196,9 +196,9 @@ export const participants = router({
       }),
     )
     .mutation(async ({ input: { participantId, token }, ctx }) => {
-      const userId = await resolveUserId(token, ctx.user);
+      const actor = await resolveActor(token, ctx.user);
 
-      const participant = await canModifyParticipant(participantId, userId);
+      const participant = await canModifyParticipant(participantId, actor.id);
 
       await prisma.participant.update({
         where: {
@@ -210,8 +210,7 @@ export const participants = router({
         },
       });
 
-      posthog()?.capture({
-        distinctId: userId,
+      track(actor, {
         event: "poll_response_delete",
         properties: {
           participant_id: participant.id,
@@ -348,8 +347,7 @@ export const participants = router({
           }),
         );
 
-        posthog()?.capture({
-          distinctId: ctx.user.id,
+        track(ctx.user, {
           event: "poll_response_submit",
           properties: {
             participant_id: participant.id,
@@ -373,7 +371,7 @@ export const participants = router({
       }),
     )
     .mutation(async ({ input: { participantId, newName, token }, ctx }) => {
-      const userId = await resolveUserId(token, ctx.user);
+      const { id: userId } = await resolveActor(token, ctx.user);
 
       await canModifyParticipant(participantId, userId);
 
@@ -402,11 +400,11 @@ export const participants = router({
       }),
     )
     .mutation(async ({ input: { participantId, votes, token }, ctx }) => {
-      const userId = await resolveUserId(token, ctx.user);
+      const actor = await resolveActor(token, ctx.user);
 
       const existingParticipant = await canModifyParticipant(
         participantId,
-        userId,
+        actor.id,
       );
 
       const pollId = existingParticipant.pollId;
@@ -468,8 +466,7 @@ export const participants = router({
         });
       });
 
-      posthog()?.capture({
-        distinctId: userId,
+      track(actor, {
         event: "poll_response_update",
         groups: {
           poll: pollId,

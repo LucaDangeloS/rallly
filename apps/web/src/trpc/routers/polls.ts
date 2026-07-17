@@ -19,7 +19,7 @@ import { MAX_POLL_DESCRIPTION_LENGTH } from "@/features/poll/schema";
 import { formatEventDateTime } from "@/features/scheduled-event/utils";
 import { getActiveSpaceForUser } from "@/features/space/data";
 import { dayjs } from "@/lib/dayjs";
-import { posthog } from "@/lib/posthog";
+import { identifyGroup, track } from "@/lib/posthog";
 import { createIcsEvent } from "@/lib/utils/ics";
 import {
   createRateLimitMiddleware,
@@ -158,8 +158,7 @@ export const polls = router({
       });
 
       if (moderation.verdict !== "safe") {
-        posthog()?.capture({
-          distinctId: ctx.user.id,
+        track(ctx.user, {
           event: "flagged_content",
           properties: {
             action: "create_poll",
@@ -262,7 +261,7 @@ export const polls = router({
         }
       }
 
-      posthog()?.groupIdentify({
+      identifyGroup({
         groupType: "poll",
         groupKey: poll.id,
         properties: {
@@ -279,9 +278,8 @@ export const polls = router({
         },
       });
 
-      posthog()?.capture({
+      track(ctx.user, {
         event: "poll_create",
-        distinctId: ctx.user.id,
         properties: {
           title: poll.title,
           optionCount: poll.options.length,
@@ -351,8 +349,7 @@ export const polls = router({
       });
 
       if (moderation.verdict !== "safe") {
-        posthog()?.capture({
-          distinctId: ctx.user.id,
+        track(ctx.user, {
           event: "flagged_content",
           properties: {
             action: "update_poll",
@@ -503,9 +500,8 @@ export const polls = router({
         input.requireParticipantEmail !== undefined;
 
       if (hasDetailsUpdate) {
-        posthog()?.capture({
+        track(ctx.user, {
           event: "poll_update_details",
-          distinctId: ctx.user.id,
           properties: {
             title: updatedPoll.title,
             has_location: !!updatedPoll.location,
@@ -519,9 +515,8 @@ export const polls = router({
       }
 
       if (hasOptionsUpdate) {
-        posthog()?.capture({
+        track(ctx.user, {
           event: "poll_update_options",
-          distinctId: ctx.user.id,
           properties: {
             option_count: updatedPoll._count.options,
           },
@@ -532,9 +527,8 @@ export const polls = router({
       }
 
       if (hasSettingsUpdate) {
-        posthog()?.capture({
+        track(ctx.user, {
           event: "poll_update_settings",
-          distinctId: ctx.user.id,
           properties: {
             disable_comments: !!updatedPoll.disableComments,
             hide_participants: !!updatedPoll.hideParticipants,
@@ -572,9 +566,8 @@ export const polls = router({
       });
 
       // Track poll deletion analytics
-      posthog()?.capture({
+      track(ctx.user, {
         event: "poll_delete",
-        distinctId: ctx.user.id,
         groups: {
           poll: pollId,
         },
@@ -601,7 +594,7 @@ export const polls = router({
         data: { muted: input.muted },
       });
 
-      posthog()?.groupIdentify({
+      identifyGroup({
         groupType: "poll",
         groupKey: input.pollId,
         properties: {
@@ -1080,9 +1073,8 @@ export const polls = router({
           );
         }
 
-        posthog()?.capture({
+        track(ctx.user, {
           event: "poll_schedule",
-          distinctId: ctx.user.id,
           properties: {
             attendee_count: attendees.length,
             days_since_created: dayjs().diff(poll.createdAt, "day"),
@@ -1130,9 +1122,8 @@ export const polls = router({
         }
       });
 
-      posthog()?.capture({
+      track(ctx.user, {
         event: "poll_reopen",
-        distinctId: ctx.user.id,
         groups: {
           poll: input.pollId,
         },
@@ -1165,9 +1156,8 @@ export const polls = router({
         },
       });
 
-      posthog()?.capture({
+      track(ctx.user, {
         event: "poll_close",
-        distinctId: ctx.user.id,
         groups: {
           poll: input.pollId,
         },
