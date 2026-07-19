@@ -1,4 +1,8 @@
 import { PostHog } from "@rallly/posthog/server";
+import {
+  getPostHogCookieName,
+  parsePostHogCookieDistinctId,
+} from "@rallly/posthog/utils";
 import type { NextRequest } from "next/server";
 import { after } from "next/server";
 import { env } from "@/env";
@@ -27,18 +31,30 @@ export function posthog() {
  * events (no person profile — they are transient and rarely convert);
  * identified users get person processing as usual. Group analytics is
  * unaffected either way.
+ *
+ * When a guest's client-side anonymous distinct_id is known (read from the
+ * posthog-js persistence cookie via getClientAnonymousDistinctId), guest
+ * events adopt it so server events stitch to the same journey as the guest's
+ * pageviews. Without it (ad blocker, GPC opt-out, cookie not yet written) we
+ * fall back to the guest user id — the event is still captured, just
+ * unstitched. Registered users always capture under their user id.
  */
 export function track(
-  user: { id: string; isGuest: boolean },
+  user: { id: string; isGuest: boolean; anonymousDistinctId?: string },
   event: {
     event: string;
     properties?: Record<string, unknown>;
     groups?: Record<string, string>;
   },
 ) {
+  const distinctId =
+    user.isGuest && user.anonymousDistinctId
+      ? user.anonymousDistinctId
+      : user.id;
+
   posthog()?.capture({
     ...event,
-    distinctId: user.id,
+    distinctId,
     properties: {
       ...event.properties,
       $process_person_profile: !user.isGuest,
@@ -47,15 +63,42 @@ export function track(
 }
 
 /**
- * Update properties on a group (e.g. poll, space). Groups are independent
- * of person profiles, so no guest handling is involved.
+ * Read the client's anonymous distinct_id from the posthog-js persistence
+ * cookie (persistence: "cookie"). Absent or malformed cookies yield undefined.
+ */
+export function getClientAnonymousDistinctId(req: NextRequest) {
+  if (!env.NEXT_PUBLIC_POSTHOG_API_KEY) {
+    return undefined;
+  }
+
+  const cookie = req.cookies.get(
+    getPostHogCookieName(env.NEXT_PUBLIC_POSTHOG_API_KEY),
+  );
+
+  return parsePostHogCookieDistinctId(cookie?.value) ?? undefined;
+}
+
+// Without an explicit distinctId, groupIdentify defaults to
+// $<groupType>_<groupKey>, creating a dummy person profile per group
+// (PostHog/posthog#7921). A single shared id caps the junk at one person.
+// Sending the event personless is not an option — ingestion only applies
+// $group_set when person processing is enabled.
+const GROUP_IDENTIFY_DISTINCT_ID = "server_group_identify";
+
+/**
+ * Update properties on a group (e.g. poll, space). Group identify events are
+ * not attributed to the acting user — actor attribution belongs on the
+ * accompanying track() event.
  */
 export function identifyGroup(group: {
   groupType: string;
   groupKey: string;
   properties?: Record<string, unknown>;
 }) {
-  posthog()?.groupIdentify(group);
+  posthog()?.groupIdentify({
+    ...group,
+    distinctId: GROUP_IDENTIFY_DISTINCT_ID,
+  });
 }
 
 export function withPostHog(
