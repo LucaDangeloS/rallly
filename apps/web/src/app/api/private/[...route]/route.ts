@@ -10,11 +10,18 @@ import {
   resolver,
   validator,
 } from "hono-openapi";
-import { getPollParticipants, getPollResults } from "@/features/poll/data";
-import { createPoll, deletePoll } from "@/features/poll/mutations";
+import {
+  getPollParticipants,
+  getPollResults,
+  listPolls,
+} from "@/features/poll/data";
+import { closePoll, createPoll, deletePoll } from "@/features/poll/mutations";
 import type { AuthorizedSpaceId } from "@/features/space/types";
 import { isMaintenanceModeEnabled } from "@/lib/maintenance";
-import { createPollRequestExamples } from "../examples";
+import {
+  createPollRequestExamples,
+  patchPollRequestExamples,
+} from "../examples";
 import {
   createPollInputSchema,
   createPollSuccessResponseSchema,
@@ -23,6 +30,10 @@ import {
   getPollParticipantsSuccessResponseSchema,
   getPollResultsSuccessResponseSchema,
   getPollSuccessResponseSchema,
+  listPollsQuerySchema,
+  listPollsSuccessResponseSchema,
+  patchPollInputSchema,
+  patchPollSuccessResponseSchema,
 } from "../schemas";
 import { spaceApiKeyAuth } from "../utils/api-key";
 import { apiError } from "../utils/poll";
@@ -154,6 +165,15 @@ async function buildOpenApiSpec() {
     const media = createPollRequestBody.content?.["application/json"];
     if (media) {
       media.examples = createPollRequestExamples;
+    }
+  }
+
+  const patchPollRequestBody =
+    spec.paths["/api/private/polls/{pollId}"]?.patch?.requestBody;
+  if (patchPollRequestBody && "content" in patchPollRequestBody) {
+    const media = patchPollRequestBody.content?.["application/json"];
+    if (media) {
+      media.examples = patchPollRequestExamples;
     }
   }
 
@@ -368,6 +388,64 @@ app.post(
 );
 
 app.get(
+  "/polls",
+  spaceApiKeyAuth,
+  rateLimit,
+  describeRoute({
+    tags: ["Polls"],
+    summary: "List polls",
+    description: [
+      "Lists the polls in the space associated with the API key, sorted by creation date (newest first).",
+      "",
+      "Use the `status` query parameter to only return polls in a given state — for example `status=open` to sweep polls that are still collecting responses. Results are paginated with a cursor: pass the `nextCursor` value from the previous response to fetch the next page.",
+    ].join("\n"),
+    security: [{ bearerAuth: [] }],
+    responses: {
+      200: {
+        description: "Successful response",
+        content: {
+          "application/json": {
+            schema: resolver(listPollsSuccessResponseSchema),
+          },
+        },
+      },
+      400: {
+        description: "Invalid query parameters",
+        content: {
+          "application/json": {
+            schema: resolver(errorResponseSchema),
+          },
+        },
+      },
+      403: spaceNotProResponse,
+      429: rateLimitExceededResponse,
+    },
+  }),
+  validator("query", listPollsQuerySchema),
+  async (c) => {
+    const { status, cursor, limit } = c.req.valid("query");
+    const { spaceId } = c.get("apiAuth");
+
+    const { polls, nextCursor } = await listPolls({
+      spaceId,
+      status,
+      cursor,
+      limit,
+    });
+
+    return c.json(
+      listPollsSuccessResponseSchema.parse({
+        data: polls.map((poll) => ({
+          ...toPollResponseBody(poll).data,
+          participantCount: poll.participantCount,
+        })),
+        nextCursor,
+      }),
+    );
+  },
+);
+
+app.get(
   "/polls/:pollId",
   spaceApiKeyAuth,
   rateLimit,
@@ -446,6 +524,84 @@ app.get(
     }
 
     return c.json(getPollSuccessResponseSchema.parse(toPollResponseBody(poll)));
+  },
+);
+
+app.patch(
+  "/polls/:pollId",
+  spaceApiKeyAuth,
+  rateLimit,
+  describeRoute({
+    tags: ["Polls"],
+    summary: "Update a poll",
+    description: [
+      'Updates a poll\'s status. Currently the only supported transition is closing a poll by sending `{ "status": "closed" }`.',
+      "",
+      "Close a poll once you have picked a date or the poll is no longer needed. Closing is non-destructive — the poll and its responses are preserved — but the results become final and participants can no longer vote. Consumers polling `GET /polls/:pollId/results` should remove closed polls from their queues.",
+      "",
+      "Closing is idempotent: closing an already-closed poll returns a `200` with the poll unchanged. The other statuses (`open`, `scheduled`, `canceled`) are not available via the API and return `422`.",
+    ].join("\n"),
+    security: [{ bearerAuth: [] }],
+    responses: {
+      200: {
+        description: "Poll updated successfully",
+        content: {
+          "application/json": {
+            schema: resolver(patchPollSuccessResponseSchema),
+          },
+        },
+      },
+      403: spaceNotProResponse,
+      429: rateLimitExceededResponse,
+      404: {
+        description: "Poll not found",
+        content: {
+          "application/json": {
+            schema: resolver(errorResponseSchema),
+          },
+        },
+      },
+      422: {
+        description: "The requested status transition is not available",
+        content: {
+          "application/json": {
+            schema: resolver(errorResponseSchema),
+          },
+        },
+      },
+    },
+  }),
+  validator("json", patchPollInputSchema),
+  async (c) => {
+    const { pollId } = c.req.param();
+    const { status } = c.req.valid("json");
+    const { spaceId } = c.get("apiAuth");
+
+    if (status !== "closed") {
+      return c.json(
+        apiError(
+          "TRANSITION_NOT_AVAILABLE",
+          `Transitioning a poll to "${status}" is not available via the API. Only "closed" is supported.`,
+        ),
+        422,
+      );
+    }
+
+    const poll = await closePoll({ pollId, spaceId });
+
+    if (!poll) {
+      return c.json(
+        apiError(
+          "POLL_NOT_FOUND",
+          "Poll not found or does not belong to this space.",
+        ),
+        404,
+      );
+    }
+
+    return c.json(
+      patchPollSuccessResponseSchema.parse(toPollResponseBody(poll)),
+    );
   },
 );
 
@@ -633,4 +789,5 @@ export { app };
 
 export const GET = handle(app);
 export const POST = handle(app);
+export const PATCH = handle(app);
 export const DELETE = handle(app);

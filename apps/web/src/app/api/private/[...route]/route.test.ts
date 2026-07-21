@@ -5,17 +5,21 @@ vi.mock("server-only", () => ({}));
 
 const mockDeletePoll = vi.fn();
 const mockCreatePoll = vi.fn();
+const mockClosePoll = vi.fn();
 const mockGetPollResults = vi.fn();
 const mockGetPollParticipants = vi.fn();
+const mockListPolls = vi.fn();
 
 vi.mock("@/features/poll/mutations", () => ({
   deletePoll: (...args: unknown[]) => mockDeletePoll(...args),
   createPoll: (...args: unknown[]) => mockCreatePoll(...args),
+  closePoll: (...args: unknown[]) => mockClosePoll(...args),
 }));
 
 vi.mock("@/features/poll/data", () => ({
   getPollResults: (...args: unknown[]) => mockGetPollResults(...args),
   getPollParticipants: (...args: unknown[]) => mockGetPollParticipants(...args),
+  listPolls: (...args: unknown[]) => mockListPolls(...args),
 }));
 
 vi.mock("@rallly/database", () => ({
@@ -58,7 +62,10 @@ vi.mock("@/lib/kv", () => ({
 import { prisma } from "@rallly/database";
 import { after } from "next/server";
 import { hashApiKey, verifyApiKey } from "@/features/api-keys/utils";
-import { createPollRequestExamples } from "../examples";
+import {
+  createPollRequestExamples,
+  patchPollRequestExamples,
+} from "../examples";
 import {
   createPollInputSchema,
   createPollSuccessResponseSchema,
@@ -66,6 +73,8 @@ import {
   getPollParticipantsSuccessResponseSchema,
   getPollResultsSuccessResponseSchema,
   getPollSuccessResponseSchema,
+  listPollsSuccessResponseSchema,
+  patchPollSuccessResponseSchema,
 } from "../schemas";
 import { RATE_LIMIT_PER_MINUTE } from "../utils/rate-limit";
 import { app } from "./route";
@@ -732,11 +741,150 @@ describe("Private API - /polls", () => {
       }
     });
 
+    it("should document the close poll transition on PATCH /polls/{pollId}", async () => {
+      const res = await app.request("/api/private/openapi");
+
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      const operation = json.paths["/api/private/polls/{pollId}"].patch;
+
+      expect(operation.summary).toBeDefined();
+      expect(operation.description).toContain("closed");
+      expect(Object.keys(operation.responses)).toEqual(
+        expect.arrayContaining(["200", "403", "404", "422", "429"]),
+      );
+
+      const media = operation.requestBody.content["application/json"];
+      expect(Object.keys(media.examples)).toEqual(
+        Object.keys(patchPollRequestExamples),
+      );
+    });
+
     it("should return docs page", async () => {
       const res = await app.request("/api/private/docs");
 
       expect(res.status).toBe(200);
       expect(res.headers.get("content-type")).toContain("text/html");
+    });
+  });
+
+  describe("Patch poll (close)", () => {
+    const closedPoll = {
+      id: "test-poll-id",
+      title: "Test Poll",
+      description: null,
+      location: null,
+      timeZone: null,
+      status: "closed",
+      createdAt: new Date("2025-01-10T12:00:00Z"),
+      user: { name: "Test User", image: null },
+      options: [],
+    };
+
+    it("should close an open poll", async () => {
+      mockClosePoll.mockResolvedValue(closedPoll);
+
+      const res = await app.request("/api/private/polls/test-poll-id", {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${testApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ status: "closed" }),
+      });
+
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expectMatchesContract(patchPollSuccessResponseSchema, json);
+      expect(json.data.id).toBe("test-poll-id");
+      expect(json.data.status).toBe("closed");
+
+      expect(mockClosePoll).toHaveBeenCalledWith({
+        pollId: "test-poll-id",
+        spaceId: "test-space-id",
+      });
+    });
+
+    it("should be idempotent when the poll is already closed", async () => {
+      mockClosePoll.mockResolvedValue(closedPoll);
+
+      const res = await app.request("/api/private/polls/test-poll-id", {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${testApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ status: "closed" }),
+      });
+
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.data.status).toBe("closed");
+    });
+
+    it("should return 404 when the poll is not found", async () => {
+      mockClosePoll.mockResolvedValue(null);
+
+      const res = await app.request("/api/private/polls/nonexistent-poll", {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${testApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ status: "closed" }),
+      });
+
+      expect(res.status).toBe(404);
+      const json = await res.json();
+      expect(json.error.code).toBe("POLL_NOT_FOUND");
+      expect(mockClosePoll).toHaveBeenCalled();
+    });
+
+    it.each([
+      "open",
+      "scheduled",
+      "canceled",
+    ])("should return 422 when transitioning to %s", async (status) => {
+      const res = await app.request("/api/private/polls/test-poll-id", {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${testApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ status }),
+      });
+
+      expect(res.status).toBe(422);
+      const json = await res.json();
+      expect(json.error.code).toBe("TRANSITION_NOT_AVAILABLE");
+      expect(mockClosePoll).not.toHaveBeenCalled();
+    });
+
+    it("should return 400 for an unknown status value", async () => {
+      const res = await app.request("/api/private/polls/test-poll-id", {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${testApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ status: "archived" }),
+      });
+
+      expect(res.status).toBe(400);
+      expect(mockClosePoll).not.toHaveBeenCalled();
+    });
+
+    it("should return 401 without authorization", async () => {
+      const res = await app.request("/api/private/polls/test-poll-id", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ status: "closed" }),
+      });
+
+      expect(res.status).toBe(401);
+      expect(mockClosePoll).not.toHaveBeenCalled();
     });
   });
 
@@ -949,6 +1097,179 @@ describe("Private API - /polls", () => {
 
     it("should return 401 without authorization", async () => {
       const res = await app.request("/api/private/polls/test-poll-id", {
+        method: "GET",
+      });
+
+      expect(res.status).toBe(401);
+    });
+  });
+
+  describe("List polls", () => {
+    const mockListedPoll = {
+      id: "test-poll-id",
+      title: "Team sync",
+      description: "Weekly team meeting",
+      location: "Zoom",
+      timeZone: "Europe/London",
+      status: "open",
+      createdAt: new Date("2025-01-10T12:00:00Z"),
+      user: {
+        name: "John Doe",
+        image: null,
+      },
+      options: [
+        {
+          id: "opt-1",
+          startTime: new Date("2025-01-15T09:00:00Z"),
+          duration: 30,
+        },
+      ],
+      participantCount: 3,
+    };
+
+    it("should return a list of polls", async () => {
+      mockListPolls.mockResolvedValue({
+        polls: [mockListedPoll],
+        nextCursor: null,
+      });
+
+      const res = await app.request("/api/private/polls", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${testApiKey}`,
+        },
+      });
+
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expectMatchesContract(listPollsSuccessResponseSchema, json);
+
+      expect(json.data).toHaveLength(1);
+      expect(json.data[0].id).toBe("test-poll-id");
+      expect(json.data[0].title).toBe("Team sync");
+      expect(json.data[0].status).toBe("open");
+      expect(json.data[0].participantCount).toBe(3);
+      expect(json.data[0].createdAt).toBe("2025-01-10T12:00:00.000Z");
+      expect(json.data[0].options).toEqual([
+        {
+          id: "opt-1",
+          startTime: "2025-01-15T09:00:00.000Z",
+          duration: 30,
+        },
+      ]);
+      expect(json.data[0].adminUrl).toBe(
+        "https://example.com/poll/test-poll-id",
+      );
+      expect(json.data[0].inviteUrl).toBe(
+        "https://example.com/invite/test-poll-id",
+      );
+      expect(json.nextCursor).toBeNull();
+
+      expect(mockListPolls).toHaveBeenCalledWith({
+        spaceId: "test-space-id",
+        status: undefined,
+        cursor: undefined,
+        limit: 20,
+      });
+    });
+
+    it("should return an empty list when the space has no polls", async () => {
+      mockListPolls.mockResolvedValue({
+        polls: [],
+        nextCursor: null,
+      });
+
+      const res = await app.request("/api/private/polls", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${testApiKey}`,
+        },
+      });
+
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expectMatchesContract(listPollsSuccessResponseSchema, json);
+      expect(json.data).toEqual([]);
+      expect(json.nextCursor).toBeNull();
+    });
+
+    it("should pass the status filter to the query", async () => {
+      mockListPolls.mockResolvedValue({
+        polls: [],
+        nextCursor: null,
+      });
+
+      const res = await app.request("/api/private/polls?status=open", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${testApiKey}`,
+        },
+      });
+
+      expect(res.status).toBe(200);
+      expect(mockListPolls).toHaveBeenCalledWith(
+        expect.objectContaining({
+          spaceId: "test-space-id",
+          status: "open",
+        }),
+      );
+    });
+
+    it("should return 400 for an invalid status", async () => {
+      const res = await app.request("/api/private/polls?status=finalized", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${testApiKey}`,
+        },
+      });
+
+      expect(res.status).toBe(400);
+      expect(mockListPolls).not.toHaveBeenCalled();
+    });
+
+    it("should pass cursor and limit to the query and return nextCursor", async () => {
+      mockListPolls.mockResolvedValue({
+        polls: [mockListedPoll],
+        nextCursor: "test-poll-id",
+      });
+
+      const res = await app.request(
+        "/api/private/polls?cursor=prev-poll-id&limit=1",
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${testApiKey}`,
+          },
+        },
+      );
+
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expectMatchesContract(listPollsSuccessResponseSchema, json);
+      expect(json.nextCursor).toBe("test-poll-id");
+
+      expect(mockListPolls).toHaveBeenCalledWith(
+        expect.objectContaining({
+          cursor: "prev-poll-id",
+          limit: 1,
+        }),
+      );
+    });
+
+    it("should return 400 when limit exceeds the maximum", async () => {
+      const res = await app.request("/api/private/polls?limit=101", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${testApiKey}`,
+        },
+      });
+
+      expect(res.status).toBe(400);
+      expect(mockListPolls).not.toHaveBeenCalled();
+    });
+
+    it("should return 401 without authorization", async () => {
+      const res = await app.request("/api/private/polls", {
         method: "GET",
       });
 
