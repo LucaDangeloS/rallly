@@ -58,7 +58,9 @@ vi.mock("@/lib/kv", () => ({
 import { prisma } from "@rallly/database";
 import { after } from "next/server";
 import { hashApiKey, verifyApiKey } from "@/features/api-keys/utils";
+import { createPollRequestExamples } from "../examples";
 import {
+  createPollInputSchema,
   createPollSuccessResponseSchema,
   deletePollSuccessResponseSchema,
   getPollParticipantsSuccessResponseSchema,
@@ -710,6 +712,26 @@ describe("Private API - /polls", () => {
       expect(json.info.title).toBe("Rallly Private API");
     });
 
+    it("should include create poll request examples that match the input schema", async () => {
+      const res = await app.request("/api/private/openapi");
+
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      const media =
+        json.paths["/api/private/polls"].post.requestBody.content[
+          "application/json"
+        ];
+      expect(Object.keys(media.examples)).toEqual(
+        Object.keys(createPollRequestExamples),
+      );
+
+      for (const example of Object.values(createPollRequestExamples)) {
+        const result = createPollInputSchema.safeParse(example.value);
+        expect(result.error).toBeUndefined();
+        expect(result.success).toBe(true);
+      }
+    });
+
     it("should return docs page", async () => {
       const res = await app.request("/api/private/docs");
 
@@ -938,6 +960,7 @@ describe("Private API - /polls", () => {
     it("should return aggregated vote results", async () => {
       mockGetPollResults.mockResolvedValue({
         pollId: "test-poll-id",
+        status: "open",
         participantCount: 5,
         highScore: 4003,
         options: [
@@ -987,6 +1010,7 @@ describe("Private API - /polls", () => {
       expectMatchesContract(getPollResultsSuccessResponseSchema, json);
 
       expect(json.data.pollId).toBe("test-poll-id");
+      expect(json.data.status).toBe("open");
       expect(json.data.participantCount).toBe(5);
       expect(json.data.highScore).toBe(4003);
       expect(json.data.options).toHaveLength(3);
@@ -997,9 +1021,41 @@ describe("Private API - /polls", () => {
       });
     });
 
+    it("should return the poll status for closed polls", async () => {
+      mockGetPollResults.mockResolvedValue({
+        pollId: "test-poll-id",
+        status: "closed",
+        participantCount: 1,
+        highScore: 1001,
+        options: [
+          {
+            id: "opt-1",
+            startTime: new Date("2025-01-15T09:00:00Z"),
+            duration: 30,
+            votes: [{ type: "yes", count: 1 }],
+            score: 1001,
+            isTopChoice: true,
+          },
+        ],
+      });
+
+      const res = await app.request("/api/private/polls/test-poll-id/results", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${testApiKey}`,
+        },
+      });
+
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expectMatchesContract(getPollResultsSuccessResponseSchema, json);
+      expect(json.data.status).toBe("closed");
+    });
+
     it("should handle ties for top choice", async () => {
       mockGetPollResults.mockResolvedValue({
         pollId: "test-poll-id",
+        status: "open",
         participantCount: 2,
         highScore: 2002,
         options: [
@@ -1041,6 +1097,7 @@ describe("Private API - /polls", () => {
     it("should prioritize total availability over yes votes", async () => {
       mockGetPollResults.mockResolvedValue({
         pollId: "test-poll-id",
+        status: "open",
         participantCount: 5,
         highScore: 5003,
         options: [
@@ -1086,6 +1143,7 @@ describe("Private API - /polls", () => {
     it("should use yes votes as tiebreaker when availability is equal", async () => {
       mockGetPollResults.mockResolvedValue({
         pollId: "test-poll-id",
+        status: "open",
         participantCount: 4,
         highScore: 4004,
         options: [
