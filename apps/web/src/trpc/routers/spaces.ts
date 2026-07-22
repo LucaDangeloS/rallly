@@ -1,20 +1,12 @@
-import { subject } from "@casl/ability";
 import { prisma } from "@rallly/database";
 import { TRPCError } from "@trpc/server";
 import * as z from "zod";
 import { createSpaceDTO } from "@/features/space/data";
-import { defineAbilityForMember } from "@/features/space/member/ability";
 import { effectiveSpaceMemberWhere } from "@/features/space/member/utils";
-import { createSpace } from "@/features/space/mutations";
 import type { SpaceDTO } from "@/features/space/types";
 import { fromDBRole } from "@/features/space/utils";
-import { identifyGroup, track } from "@/lib/posthog";
-import {
-  createRateLimitMiddleware,
-  privateProcedure,
-  router,
-  spaceProcedure,
-} from "../trpc";
+import { track } from "@/lib/posthog";
+import { privateProcedure, router, spaceProcedure } from "../trpc";
 
 export const spaces = router({
   // ── Queries ──────────────────────────────────────────────────────────
@@ -127,79 +119,6 @@ export const spaces = router({
     }));
   }),
   // ── Mutations ────────────────────────────────────────────────────────
-  create: privateProcedure
-    .use(createRateLimitMiddleware("space_create", 5, "1 m"))
-    .input(z.object({ name: z.string().min(1).max(100) }))
-    .mutation(async ({ ctx, input }) => {
-      const space = await createSpace({
-        name: input.name,
-        ownerId: ctx.user.id,
-      });
-
-      identifyGroup({
-        groupType: "space",
-        groupKey: space.id,
-        properties: {
-          name: space.name,
-          member_count: 1,
-          seat_count: 1,
-          tier: "hobby",
-        },
-      });
-
-      track(ctx.user, {
-        event: "space_create",
-        properties: {
-          space_name: space.name,
-        },
-        groups: {
-          space: space.id,
-        },
-      });
-
-      return space;
-    }),
-
-  delete: spaceProcedure.mutation(async ({ ctx }) => {
-    const memberAbility = defineAbilityForMember({
-      user: ctx.user,
-      space: ctx.space,
-    });
-
-    if (memberAbility.cannot("delete", subject("Space", ctx.space))) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: "You do not have permission to delete this space",
-      });
-    }
-
-    const activeSubscriptionCount = await prisma.subscription.count({
-      where: { spaceId: ctx.space.id, active: true },
-    });
-
-    if (activeSubscriptionCount > 0) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message:
-          "Cannot delete space with an active subscription. Please cancel the subscription first.",
-      });
-    }
-
-    await prisma.space.delete({
-      where: { id: ctx.space.id },
-    });
-
-    track(ctx.user, {
-      event: "space_delete",
-      properties: {
-        space_id: ctx.space.id,
-      },
-      groups: {
-        space: ctx.space.id,
-      },
-    });
-  }),
-
   leave: spaceProcedure.mutation(async ({ ctx }) => {
     if (ctx.space.ownerId === ctx.user.id) {
       throw new TRPCError({
