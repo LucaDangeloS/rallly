@@ -4,7 +4,7 @@ import { SetupFooter } from "@/app/[locale]/setup/components/setup-footer";
 import { SetupForm } from "@/app/[locale]/setup/components/setup-form";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 import { Logo } from "@/features/branding/components/logo";
-import { getActiveSpaceForUser } from "@/features/space/data";
+import { getOwnedSpace } from "@/features/space/data";
 import { requireUser } from "@/features/user/loaders";
 import { Trans } from "@/i18n/client";
 import { getTranslation } from "@/i18n/server";
@@ -17,9 +17,16 @@ export default async function SetupPage(props: {
   const user = await requireUser();
   const searchParams = await props.searchParams;
 
-  const space = await getActiveSpaceForUser(user.id);
+  // Whether onboarding is done is "does a space exist", not "is one
+  // active": getActiveSpaceForUser hides memberships in hobby spaces the
+  // user doesn't own, so gating on it sent established accounts back here
+  // and had them create a second space.
+  const space = await getOwnedSpace(user.id);
 
-  if (user.name && user.timeZone && user.timeFormat && space) {
+  // Mirrors the gate in features/space/loaders.ts: name and a space are
+  // required, timezone and time format are not. The two conditions have to
+  // agree or the user ping-pongs between here and the app.
+  if (user.name && space) {
     redirect(validateRedirectUrl(searchParams?.redirectTo) ?? "/");
   }
 
