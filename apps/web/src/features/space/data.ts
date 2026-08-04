@@ -137,6 +137,7 @@ export function createSpaceDTO(space: {
   tier: DBSpaceTier;
   primaryColor?: string | null;
   showBranding: boolean;
+  hideAttribution: boolean;
   memberCount: number;
   seatCount: number;
 }): SpaceDTO {
@@ -151,6 +152,7 @@ export function createSpaceDTO(space: {
     image: space.image ?? undefined,
     primaryColor: space.primaryColor ?? undefined,
     showBranding: space.showBranding,
+    hideAttribution: space.hideAttribution,
   };
 }
 
@@ -203,6 +205,42 @@ export const getOwnedSpace = cache(async (userId: string) => {
     where: { ownerId: userId },
     select: { id: true },
   });
+});
+
+export const listSpacesForUser = cache(async (userId: string) => {
+  const result = await prisma.spaceMember.findMany({
+    where: effectiveSpaceMemberWhere({ userId }),
+    select: {
+      role: true,
+      space: {
+        select: {
+          id: true,
+          name: true,
+          image: true,
+          ownerId: true,
+          tier: true,
+          primaryColor: true,
+          showBranding: true,
+          hideAttribution: true,
+          _count: { select: { members: true } },
+          subscriptions: {
+            where: { active: true },
+            select: { quantity: true },
+            take: 1,
+          },
+        },
+      },
+    },
+  });
+
+  return result.map((spaceMember) =>
+    createSpaceDTO({
+      ...spaceMember.space,
+      role: spaceMember.role,
+      memberCount: spaceMember.space._count.members,
+      seatCount: spaceMember.space.subscriptions[0]?.quantity ?? 1,
+    }),
+  );
 });
 
 export const getActiveSpaceForUser = cache(async (userId: string) => {

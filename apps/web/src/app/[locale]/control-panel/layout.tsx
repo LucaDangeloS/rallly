@@ -2,26 +2,23 @@ import { Icon } from "@rallly/ui/icon";
 import { SidebarInset, SidebarTrigger } from "@rallly/ui/sidebar";
 import { GaugeIcon } from "lucide-react";
 import type { Metadata } from "next";
+import { Suspense } from "react";
+import { RouterLoadingIndicator } from "@/components/router-loading-indicator";
 import { LicenseLimitWarning } from "@/features/licensing/components/license-limit-warning";
 import { CommandMenu } from "@/features/navigation/components/command-menu";
 import { UserProvider } from "@/features/user/client";
+import { requireAdmin } from "@/features/user/loaders";
 import { Trans } from "@/i18n/client";
 import { getTranslation } from "@/i18n/server";
 import { getLocale } from "@/i18n/server/get-locale";
 import { DateTimeProvider } from "@/lib/datetime/client";
-import { createAdminSSRHelper } from "@/trpc/server/create-ssr-helper";
 import { ControlPanelSidebarProvider } from "./control-panel-sidebar-provider";
 import { ControlPanelSidebar } from "./sidebar";
 
-export default async function AdminLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const [locale, { user }] = await Promise.all([
-    getLocale(),
-    createAdminSSRHelper(),
-  ]);
+// The admin gate awaits below the Suspense boundary in the default export
+// so the document shell can flush before the session store responds.
+async function AdminGate({ children }: { children: React.ReactNode }) {
+  const [locale, user] = await Promise.all([getLocale(), requireAdmin()]);
 
   return (
     <UserProvider user={user}>
@@ -56,6 +53,18 @@ export default async function AdminLayout({
         </ControlPanelSidebarProvider>
       </DateTimeProvider>
     </UserProvider>
+  );
+}
+
+export default function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <Suspense fallback={<RouterLoadingIndicator />}>
+      <AdminGate>{children}</AdminGate>
+    </Suspense>
   );
 }
 
