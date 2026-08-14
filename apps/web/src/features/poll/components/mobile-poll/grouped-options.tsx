@@ -29,7 +29,7 @@ const GroupedOptions: React.FunctionComponent<GroupedOptionsProps> = ({
           <div key={day}>
             <div
               className={cn(
-                "flex border-b bg-muted px-4 py-2 font-medium text-xs uppercase",
+                "border-b bg-card/80 px-4 py-3 font-semibold text-sm",
                 groupClassName,
               )}
             >
