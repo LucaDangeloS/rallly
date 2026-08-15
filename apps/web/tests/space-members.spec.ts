@@ -68,9 +68,9 @@ function mainContent(page: Page) {
   return page.locator("#main-content");
 }
 
-async function gotoMembersSettings(page: Page, email: string) {
+async function gotoMembersPage(page: Page, email: string) {
   await loginWithEmail(page, { email });
-  await page.goto("/settings/members");
+  await page.goto("/members");
   await page.getByRole("heading", { name: "Members" }).waitFor();
 }
 
@@ -95,9 +95,9 @@ test.describe("Space members", () => {
     const owner = await createSpaceAdmin({ name: "Invite Owner", seats: 3 });
     const inviteeEmail = `invitee-${runId}@example.com`;
 
-    await gotoMembersSettings(page, owner.email);
+    await gotoMembersPage(page, owner.email);
     await expect(
-      mainContent(page).getByText("1 of 3 seats used"),
+      mainContent(page).getByText("2 seats available"),
     ).toBeVisible();
 
     await page.getByRole("button", { name: "Invite member" }).click();
@@ -106,10 +106,18 @@ test.describe("Space members", () => {
     await dialog.getByRole("button", { name: "Send invite" }).click();
 
     await expect(page.getByText("Invitation sent")).toBeVisible();
+    await expect(
+      mainContent(page).getByText("There is 1 pending invite"),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "View invites" }).click();
     await expect(memberRow(page, inviteeEmail)).toBeVisible();
     await expect(
       memberRow(page, inviteeEmail).getByText(`Invited by ${owner.user.name}`),
     ).toBeVisible();
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Close" })
+      .click();
 
     // Capture the invite email before triggering the invitee's login so
     // the OTP capture doesn't pick it up instead.
@@ -134,11 +142,9 @@ test.describe("Space members", () => {
     await page.reload();
     await expect(memberRow(page, "Invited Member")).toBeVisible();
     await expect(
-      memberRow(page, inviteeEmail).getByText(`Invited by ${owner.user.name}`),
+      mainContent(page).getByText("There is 1 pending invite"),
     ).toBeHidden();
-    await expect(
-      mainContent(page).getByText("2 of 3 seats used"),
-    ).toBeVisible();
+    await expect(mainContent(page).getByText("1 seat available")).toBeVisible();
   });
 
   test("admin can cancel a pending invite", async ({ page }) => {
@@ -154,16 +160,23 @@ test.describe("Space members", () => {
       },
     });
 
-    await gotoMembersSettings(page, owner.email);
+    await gotoMembersPage(page, owner.email);
+
+    await expect(
+      mainContent(page).getByText("There is 1 pending invite"),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "View invites" }).click();
 
     const inviteRow = memberRow(page, inviteeEmail);
     await expect(inviteRow).toBeVisible();
-    await inviteRow.getByRole("button", { name: "More options" }).click();
-    await page.getByRole("menuitem", { name: "Cancel invite" }).click();
+    await inviteRow.getByRole("button", { name: "Cancel" }).click();
     await page.getByRole("button", { name: "Confirm" }).click();
 
     await expect(page.getByText("Invite canceled successfully")).toBeVisible();
     await expect(inviteRow).toBeHidden();
+    await expect(
+      mainContent(page).getByText("There is 1 pending invite"),
+    ).toBeHidden();
   });
 
   test("admin can change a member's role", async ({ page }) => {
@@ -173,7 +186,7 @@ test.describe("Space members", () => {
       name: "Role Member",
     });
 
-    await gotoMembersSettings(page, owner.email);
+    await gotoMembersPage(page, owner.email);
 
     const row = memberRow(page, member.email);
     await expect(row.getByText("Member", { exact: true })).toBeVisible();
@@ -191,10 +204,8 @@ test.describe("Space members", () => {
       name: "Removable Member",
     });
 
-    await gotoMembersSettings(page, owner.email);
-    await expect(
-      mainContent(page).getByText("2 of 3 seats used"),
-    ).toBeVisible();
+    await gotoMembersPage(page, owner.email);
+    await expect(mainContent(page).getByText("1 seat available")).toBeVisible();
 
     const row = memberRow(page, member.email);
     await row.getByRole("button", { name: "More options" }).click();
@@ -205,7 +216,7 @@ test.describe("Space members", () => {
     await expect(row).toBeHidden();
 
     await expect(
-      mainContent(page).getByText("1 of 3 seats used"),
+      mainContent(page).getByText("2 seats available"),
     ).toBeVisible();
   });
 
@@ -214,10 +225,10 @@ test.describe("Space members", () => {
   }) => {
     const owner = await createSpaceAdmin({ name: "Full Owner", seats: 1 });
 
-    await gotoMembersSettings(page, owner.email);
+    await gotoMembersPage(page, owner.email);
 
     await expect(
-      mainContent(page).getByText("1 of 1 seats used"),
+      mainContent(page).getByText("No seats available"),
     ).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Invite member" }),

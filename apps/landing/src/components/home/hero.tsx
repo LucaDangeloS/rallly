@@ -1,4 +1,5 @@
 "use client";
+import { posthog } from "@rallly/posthog/client";
 import { buttonVariants, cn } from "@rallly/ui";
 import { Badge } from "@rallly/ui/badge";
 import { ChevronRightIcon } from "lucide-react";
@@ -62,6 +63,7 @@ const Screenshot = () => {
           width={1440}
           height={1152}
           quality={100}
+          preload
           onLoad={() => {
             setIsLoaded(true);
           }}
@@ -118,6 +120,9 @@ export const MarketingHero = ({
               variant: "primary",
               className: "shadow-md transition-all active:shadow-none",
             })}
+            onClick={() => {
+              posthog.capture("landing:hero_cta_click");
+            }}
           >
             {callToAction}
           </Link>
