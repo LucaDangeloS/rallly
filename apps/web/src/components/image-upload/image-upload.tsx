@@ -10,7 +10,10 @@ import type {
   ImageUploadPreviewProps,
   ImageUploadProps,
 } from "@/components/image-upload/types";
-import { allowedMimeTypes } from "@/components/image-upload/types";
+import {
+  allowedMimeTypes,
+  defaultAcceptedMimeTypes,
+} from "@/components/image-upload/types";
 import { Trans, useTranslation } from "@/i18n/client";
 import { useFeatureFlag } from "@/lib/feature-flags/client";
 import {
@@ -30,7 +33,11 @@ export function ImageUploadControl({
   onUploadSuccess,
   onRemoveSuccess,
   hasCurrentImage = false,
+  crop = true,
+  accept = defaultAcceptedMimeTypes,
+  disabled = false,
 }: ImageUploadControlProps) {
+  const acceptsSvg = accept.includes("image/svg+xml");
   const isStorageEnabled = useFeatureFlag("storage");
 
   const { t } = useTranslation();
@@ -55,7 +62,7 @@ export function ImageUploadControl({
     if (!file) return;
 
     // Validate the file
-    const validation = validateImageFile(file);
+    const validation = validateImageFile(file, accept);
     if (!validation.success) {
       switch (validation.error) {
         case "invalidFileType":
@@ -64,9 +71,13 @@ export function ImageUploadControl({
               defaultValue: "Invalid file type",
             }),
             {
-              description: t("invalidFileTypeDescription", {
-                defaultValue: "Please upload a JPG or PNG file.",
-              }),
+              description: acceptsSvg
+                ? t("invalidFileTypeSvgDescription", {
+                    defaultValue: "Please upload an SVG, JPG or PNG file.",
+                  })
+                : t("invalidFileTypeDescription", {
+                    defaultValue: "Please upload a JPG or PNG file.",
+                  }),
             },
           );
           break;
@@ -91,6 +102,12 @@ export function ImageUploadControl({
       return;
     }
 
+    if (!crop) {
+      startUpload(file);
+      event.target.value = "";
+      return;
+    }
+
     // Create preview URL and show cropping dialog
     const { url, cleanup } = createImagePreviewUrl(file);
     setOriginalFile(file);
@@ -102,26 +119,24 @@ export function ImageUploadControl({
     event.target.value = "";
   };
 
-  const handleCropComplete = async (croppedFile: File) => {
-    if (!originalFile) return;
-
-    const parsedFileType = allowedMimeTypes.parse(croppedFile.type);
+  const startUpload = (file: File, onUploaded?: () => void) => {
+    const parsedFileType = allowedMimeTypes.parse(file.type);
 
     startUploading(async () => {
       try {
         const { url, fields } = await getUploadUrl({
           fileType: parsedFileType,
-          fileSize: croppedFile.size,
+          fileSize: file.size,
         });
 
         await uploadImage({
-          file: croppedFile,
+          file,
           url,
           fileType: parsedFileType,
         });
 
-        onUploadSuccess(fields.key);
-        handleCloseCropDialog();
+        await onUploadSuccess(fields.key);
+        onUploaded?.();
       } catch {
         toast.error(
           t("errorUploadPicture", {
@@ -136,6 +151,12 @@ export function ImageUploadControl({
         );
       }
     });
+  };
+
+  const handleCropComplete = async (croppedFile: File) => {
+    if (!originalFile) return;
+
+    startUpload(croppedFile, handleCloseCropDialog);
   };
 
   const handleCloseCropDialog = () => {
@@ -162,7 +183,7 @@ export function ImageUploadControl({
         <div className="flex gap-2">
           <Button
             loading={isUploading}
-            disabled={!isStorageEnabled}
+            disabled={disabled || !isStorageEnabled}
             onClick={() => {
               fileInputRef.current?.click();
             }}
@@ -170,21 +191,33 @@ export function ImageUploadControl({
             <Trans i18nKey="chooseImage" defaults="Choose…" />
           </Button>
           {hasCurrentImage ? (
-            <Button loading={isRemoving} variant="ghost" onClick={handleRemove}>
+            <Button
+              loading={isRemoving}
+              disabled={disabled}
+              variant="ghost"
+              onClick={handleRemove}
+            >
               <Trans i18nKey="removeImage" defaults="Remove" />
             </Button>
           ) : null}
         </div>
         <p className="text-muted-foreground text-xs">
-          <Trans
-            i18nKey="imageUploadDescription"
-            defaults="Up to 2MB, JPG or PNG"
-          />
+          {acceptsSvg ? (
+            <Trans
+              i18nKey="imageUploadSvgDescription"
+              defaults="Up to 2MB, SVG, JPG or PNG"
+            />
+          ) : (
+            <Trans
+              i18nKey="imageUploadDescription"
+              defaults="Up to 2MB, JPG or PNG"
+            />
+          )}
         </p>
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*"
+          accept={accept.join(",")}
           onChange={handleFileChange}
           className="hidden"
         />
