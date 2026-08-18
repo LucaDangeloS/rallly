@@ -38,13 +38,13 @@ export async function Cta({
                 t={t}
                 ns="home"
                 i18nKey="finalCtaDescription"
-                defaults="Create a poll, share the link, and let everyone vote on times that work."
+                defaults="Set up your poll in under a minute. No account, no downloads, no chasing people for replies."
               />
             )}
           </p>
         </div>
         <div className="mt-6 flex flex-col items-start gap-4">
-          <CtaButton captureEvent="landing:final_cta_click">
+          <CtaButton size="lg" captureEvent="landing:final_cta_click">
             {callToAction ?? (
               <Trans
                 t={t}

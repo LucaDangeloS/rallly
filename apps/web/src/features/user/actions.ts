@@ -4,6 +4,8 @@ import { prisma } from "@rallly/database";
 import { supportedLngs } from "@rallly/languages";
 import { headers } from "next/headers";
 import * as z from "zod";
+import { avatarAssetProfile } from "@/features/user/constants";
+import { isEmailTaken } from "@/features/user/data";
 import { banUser, unbanUser, updateUserRole } from "@/features/user/mutations";
 import authLib from "@/lib/auth";
 import { timeFormatSchema, weekStartSchema } from "@/lib/datetime/schema";
@@ -14,9 +16,10 @@ import {
   createRateLimitMiddleware,
 } from "@/lib/safe-action/server";
 import {
-  deleteImageFromS3,
-  getImageUploadUrl,
-} from "@/lib/storage/image-upload";
+  assertAssetKey,
+  createAssetUploadUrl,
+  replaceStoredAsset,
+} from "@/lib/storage/asset-upload";
 import { timezoneSchema } from "@/lib/utils/timezone-schema";
 
 // Self-profile updates call Better-Auth's updateUser endpoint directly
@@ -68,18 +71,46 @@ export const updateLocalizationAction = authActionClient
     });
   });
 
+// Better-Auth's request-email-change endpoint returns success without sending
+// anything when the address already belongs to an account, to avoid confirming
+// that it is registered. That leaves the caller unable to tell "code sent" from
+// "silently skipped", so check first and report the conflict as a value. The
+// address can still be claimed between this check and verification, which the
+// verify step handles via its own "email already in use" error.
+export const checkEmailAvailabilityAction = authActionClient
+  .metadata({ actionName: "check_email_availability" })
+  .use(createRateLimitMiddleware(10, "1 h"))
+  .inputSchema(
+    z.object({
+      email: z.email(),
+    }),
+  )
+  .action(async ({ ctx, parsedInput }) => {
+    const email = parsedInput.email.toLowerCase();
+
+    if (email === ctx.user.email.toLowerCase()) {
+      return { ok: false as const, reason: "same_email" as const };
+    }
+
+    if (await isEmailTaken(email)) {
+      return { ok: false as const, reason: "email_taken" as const };
+    }
+
+    return { ok: true as const };
+  });
+
 export const getAvatarUploadUrlAction = authActionClient
   .metadata({ actionName: "get_avatar_upload_url" })
   .use(createRateLimitMiddleware(10, "1 h"))
   .inputSchema(
     z.object({
-      fileType: z.enum(["image/jpeg", "image/png"]),
-      fileSize: z.number(),
+      fileType: z.enum(avatarAssetProfile.accept),
+      fileSize: z.number().int().positive().max(avatarAssetProfile.maxSize),
     }),
   )
   .action(async ({ ctx, parsedInput }) => {
-    return await getImageUploadUrl({
-      keyPrefix: "avatars",
+    return await createAssetUploadUrl({
+      profile: avatarAssetProfile,
       entityId: ctx.user.id,
       fileType: parsedInput.fileType,
       fileSize: parsedInput.fileSize,
@@ -96,44 +127,36 @@ export const updateUserAvatarAction = authActionClient
   .action(async ({ ctx, parsedInput }) => {
     const { imageKey } = parsedInput;
 
-    if (!imageKey.startsWith(`avatars/${ctx.user.id}-`)) {
-      throw new AppError({
-        code: "FORBIDDEN",
-        message: "Invalid image key",
-      });
-    }
-
-    const oldImageKey = ctx.user.image;
-
-    await authLib.api.updateUser({
-      body: { image: imageKey },
-      headers: await headers(),
+    assertAssetKey(imageKey, {
+      profile: avatarAssetProfile,
+      entityId: ctx.user.id,
     });
 
-    // Only delete from storage if it's an internal avatar, not an external
-    // URL from an OAuth provider.
-    if (oldImageKey && !oldImageKey.startsWith("https://")) {
-      await deleteImageFromS3(oldImageKey);
-    }
+    await replaceStoredAsset({
+      currentKey: ctx.user.image,
+      nextKey: imageKey,
+      persist: async () => {
+        await authLib.api.updateUser({
+          body: { image: imageKey },
+          headers: await headers(),
+        });
+      },
+    });
   });
 
 export const removeUserAvatarAction = authActionClient
   .metadata({ actionName: "remove_user_avatar" })
   .action(async ({ ctx }) => {
-    const oldImageKey = ctx.user.image;
-
-    await authLib.api.updateUser({
-      body: { image: null },
-      headers: await headers(),
+    await replaceStoredAsset({
+      currentKey: ctx.user.image,
+      nextKey: null,
+      persist: async () => {
+        await authLib.api.updateUser({
+          body: { image: null },
+          headers: await headers(),
+        });
+      },
     });
-
-    // Only delete from storage if it's an internal avatar, not an external
-    // URL from an OAuth provider.
-    const isInternalAvatar = oldImageKey && !oldImageKey.startsWith("https://");
-
-    if (isInternalAvatar) {
-      await deleteImageFromS3(oldImageKey);
-    }
   });
 
 export const changeRoleAction = adminActionClient
