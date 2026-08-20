@@ -7,9 +7,11 @@ import {
   CalendarCheckIcon,
   CalendarSearchIcon,
   ClockIcon,
+  CopyIcon,
   EyeOffIcon,
   LifeBuoyIcon,
   PaletteIcon,
+  Settings2Icon,
   TimerResetIcon,
   UserPlusIcon,
 } from "lucide-react";
@@ -17,7 +19,7 @@ import { cacheLife } from "next/cache";
 import Link from "next/link";
 import { Trans } from "react-i18next/TransWithoutContext";
 
-import { AnimatedStat } from "@/components/home/animated-number";
+import { PeopleBadge, PollsBadge } from "@/components/home/animated-number";
 import { Cta } from "@/components/home/cta";
 import { Faq, FaqItem } from "@/components/home/faq";
 import { Hero } from "@/components/home/hero";
@@ -46,6 +48,7 @@ import {
   CompareTableDash,
   CompareTableFeature,
   CompareTableHead,
+  CompareTableTooltip,
 } from "./compare-table";
 import {
   PlanBenefit,
@@ -359,6 +362,44 @@ export default async function Page(props: {
                     />
                   </PlanBenefitTooltip>
                 </PlanBenefit>
+                <PlanBenefit icon={<CopyIcon />}>
+                  <PlanBenefitTooltip
+                    content={
+                      <Trans
+                        t={t}
+                        ns="pricing"
+                        i18nKey="duplicatePollsDescription"
+                        defaults="Create a new poll based on an existing one"
+                      />
+                    }
+                  >
+                    <Trans
+                      t={t}
+                      ns="pricing"
+                      i18nKey="duplicatePolls"
+                      defaults="Duplicate polls"
+                    />
+                  </PlanBenefitTooltip>
+                </PlanBenefit>
+                <PlanBenefit icon={<Settings2Icon />}>
+                  <PlanBenefitTooltip
+                    content={
+                      <Trans
+                        t={t}
+                        ns="pricing"
+                        i18nKey="advancedPollSettingsDescription"
+                        defaults="Require participant emails, hide participant names, and hide votes"
+                      />
+                    }
+                  >
+                    <Trans
+                      t={t}
+                      ns="pricing"
+                      i18nKey="advancedPollSettings"
+                      defaults="Advanced poll settings"
+                    />
+                  </PlanBenefitTooltip>
+                </PlanBenefit>
                 <PlanBenefit icon={<UserPlusIcon />}>
                   <PlanBenefitName>
                     <Trans
@@ -388,11 +429,12 @@ export default async function Page(props: {
             t={t}
             ns="home"
             i18nKey="statsLast30Days"
-            defaults="<b>{voterCount, plural, one {# person} other {# people}}</b> voted on <b>{pollCount, plural, one {# poll} other {# polls}}</b> in the last 30 days"
+            defaults="<0>{voterCount, plural, one {# person} other {# people}}</0> voted on <1>{pollCount, plural, one {# poll} other {# polls}}</1> in the last 30 days"
             values={{ voterCount, pollCount }}
-            components={{
-              b: <AnimatedStat locale={locale} />,
-            }}
+            components={[
+              <PeopleBadge key="people" locale={locale} />,
+              <PollsBadge key="polls" locale={locale} />,
+            ]}
           />
         </Stats>
       </Section>
@@ -496,12 +538,23 @@ export default async function Page(props: {
                   />
                 </CompareTableFeature>
                 <CompareTableCell>
-                  <Trans
-                    t={t}
-                    ns="pricing"
-                    i18nKey="comparePollRetention30Days"
-                    defaults="30 days"
-                  />
+                  <CompareTableTooltip
+                    content={
+                      <Trans
+                        t={t}
+                        ns="pricing"
+                        i18nKey="thirtyDayPollRetentionDescription"
+                        defaults="Polls are kept for 30 days after their final date"
+                      />
+                    }
+                  >
+                    <Trans
+                      t={t}
+                      ns="pricing"
+                      i18nKey="comparePollRetention30Days"
+                      defaults="30 days"
+                    />
+                  </CompareTableTooltip>
                 </CompareTableCell>
                 <CompareTableCell>
                   <Trans
@@ -520,6 +573,49 @@ export default async function Page(props: {
                     i18nKey="finalizeDate"
                     defaults="Finalize date"
                   />
+                </CompareTableFeature>
+                <CompareTableCell>
+                  <CompareTableDash label={notIncluded} />
+                </CompareTableCell>
+                <CompareTableCell>
+                  <CompareTableCheck label={included} />
+                </CompareTableCell>
+              </tr>
+              <tr>
+                <CompareTableFeature>
+                  <Trans
+                    t={t}
+                    ns="pricing"
+                    i18nKey="duplicatePolls"
+                    defaults="Duplicate polls"
+                  />
+                </CompareTableFeature>
+                <CompareTableCell>
+                  <CompareTableDash label={notIncluded} />
+                </CompareTableCell>
+                <CompareTableCell>
+                  <CompareTableCheck label={included} />
+                </CompareTableCell>
+              </tr>
+              <tr>
+                <CompareTableFeature>
+                  <CompareTableTooltip
+                    content={
+                      <Trans
+                        t={t}
+                        ns="pricing"
+                        i18nKey="advancedPollSettingsDescription"
+                        defaults="Require participant emails, hide participant names, and hide votes"
+                      />
+                    }
+                  >
+                    <Trans
+                      t={t}
+                      ns="pricing"
+                      i18nKey="advancedPollSettings"
+                      defaults="Advanced poll settings"
+                    />
+                  </CompareTableTooltip>
                 </CompareTableFeature>
                 <CompareTableCell>
                   <CompareTableDash label={notIncluded} />
@@ -719,6 +815,71 @@ export default async function Page(props: {
                     b: <strong />,
                   }}
                   defaults="You can cancel your subscription at any time by going to your <a>billing settings</a>. Once you cancel your subscription, you will still have access to your paid plan until the end of your billing period. After that, you will be downgraded to a free plan."
+                />
+              </FaqItem>
+              <FaqItem
+                question={
+                  <Trans
+                    t={t}
+                    ns="home"
+                    i18nKey="faqNonprofit"
+                    defaults="Do you offer discounts for nonprofits?"
+                  />
+                }
+              >
+                <Trans
+                  t={t}
+                  ns="home"
+                  i18nKey="faqNonprofitAnswer"
+                  defaults="Yes. We offer discounted Rallly Pro subscriptions for registered nonprofits. Email us at <0>support@rallly.co</0> and we will get you set up."
+                  components={[
+                    <a
+                      key="email"
+                      className={faqLinkClassName}
+                      href="mailto:support@rallly.co"
+                    />,
+                  ]}
+                />
+              </FaqItem>
+              <FaqItem
+                question={
+                  <Trans
+                    t={t}
+                    ns="home"
+                    i18nKey="faqTeams"
+                    defaults="How does Rallly work for teams?"
+                  />
+                }
+              >
+                <Trans
+                  t={t}
+                  ns="home"
+                  i18nKey="faqTeamsAnswer"
+                  defaults="You can invite your team into a shared space where everyone creates and manages polls together. Billing is centralized. A single subscription covers the whole team, and you can add or remove seats as your team changes."
+                />
+              </FaqItem>
+              <FaqItem
+                question={
+                  <Trans
+                    t={t}
+                    ns="home"
+                    i18nKey="faqSelfHost"
+                    defaults="Can I self-host Rallly?"
+                  />
+                }
+              >
+                <Trans
+                  t={t}
+                  ns="home"
+                  i18nKey="faqSelfHostAnswer"
+                  defaults="Yes. Rallly is open source and can be deployed on your own infrastructure with Docker. Check the <0>self-hosting docs</0> to get started."
+                  components={[
+                    <a
+                      key="docs"
+                      className={faqLinkClassName}
+                      href="https://support.rallly.co/self-hosting/installation/docker"
+                    />,
+                  ]}
                 />
               </FaqItem>
             </Faq>
