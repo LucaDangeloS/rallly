@@ -5,6 +5,7 @@ import DiscordIcon from "@/assets/discord.svg";
 import GithubIcon from "@/assets/github.svg";
 import LinkedinIcon from "@/assets/linkedin.svg";
 import XIcon from "@/assets/x.svg";
+import { FooterDemo } from "@/components/home/footer-demo";
 import { LinkBase } from "@/i18n/client/link";
 import { getTranslation } from "@/i18n/server";
 import { LanguageSelect } from "./language-select";
@@ -13,69 +14,74 @@ export const Footer = async ({ locale }: { locale: string }) => {
   const { t } = await getTranslation(locale, "common");
   return (
     <div className="mx-auto space-y-12">
-      <div className="space-y-6">
-        <div className="relative size-8">
-          <Image
-            src="/logo-footer.svg"
-            fill
-            alt="Rallly"
-            className="object-contain"
-          />
+      <div className="flex flex-col gap-8 lg:flex-row lg:items-center">
+        <div className="space-y-6">
+          <div className="relative size-8">
+            <Image
+              src="/logo-footer.svg"
+              fill
+              alt="Rallly"
+              className="object-contain"
+            />
+          </div>
+          <p className="max-w-sm text-pretty text-gray-600 text-sm leading-relaxed">
+            <Trans
+              t={t}
+              ns="common"
+              i18nKey="footerTagline"
+              defaults="Rallly is an open-source meeting scheduling tool that helps you find the best time to meet, without the back and forth."
+            />
+          </p>
+          <div className="flex items-center space-x-4">
+            <a
+              target="_blank"
+              href="https://x.com/ralllyco"
+              className="text-gray-600 text-sm hover:text-primary hover:no-underline"
+              rel="noreferrer noopener"
+              aria-label={t("footerXLabel", { defaultValue: "Follow us on X" })}
+            >
+              <XIcon className="size-4" />
+            </a>
+            <a
+              target="_blank"
+              href="https://discord.gg/uzg4ZcHbuM"
+              className="text-gray-600 text-sm hover:text-primary hover:no-underline"
+              rel="noreferrer noopener"
+              aria-label={t("footerDiscordLabel", {
+                defaultValue: "Join us on Discord",
+              })}
+            >
+              <DiscordIcon className="size-4" />
+            </a>
+            <a
+              target="_blank"
+              href="https://www.linkedin.com/company/rallly"
+              className="text-gray-600 text-sm hover:text-primary hover:no-underline"
+              rel="noreferrer noopener"
+              aria-label={t("footerLinkedinLabel", {
+                defaultValue: "Follow us on LinkedIn",
+              })}
+            >
+              <LinkedinIcon className="size-4" />
+            </a>
+            <a
+              target="_blank"
+              href="https://github.com/lukevella/rallly"
+              className="text-gray-600 text-sm hover:text-primary hover:no-underline"
+              rel="noreferrer noopener"
+              aria-label={t("footerGithubLabel", {
+                defaultValue: "View our GitHub repository",
+              })}
+            >
+              <GithubIcon className="size-4" />
+            </a>
+          </div>
         </div>
-        <p className="max-w-sm text-pretty text-gray-600 text-sm leading-relaxed">
-          <Trans
-            t={t}
-            ns="common"
-            i18nKey="footerTagline"
-            defaults="Rallly is an open-source meeting scheduling tool that helps you find the best time to meet, without the back and forth."
-          />
-        </p>
-        <div className="flex items-center space-x-4">
-          <a
-            target="_blank"
-            href="https://x.com/ralllyco"
-            className="text-gray-600 text-sm hover:text-primary hover:no-underline"
-            rel="noreferrer noopener"
-            aria-label={t("footerXLabel", { defaultValue: "Follow us on X" })}
-          >
-            <XIcon className="size-4" />
-          </a>
-          <a
-            target="_blank"
-            href="https://discord.gg/uzg4ZcHbuM"
-            className="text-gray-600 text-sm hover:text-primary hover:no-underline"
-            rel="noreferrer noopener"
-            aria-label={t("footerDiscordLabel", {
-              defaultValue: "Join us on Discord",
-            })}
-          >
-            <DiscordIcon className="size-4" />
-          </a>
-          <a
-            target="_blank"
-            href="https://www.linkedin.com/company/rallly"
-            className="text-gray-600 text-sm hover:text-primary hover:no-underline"
-            rel="noreferrer noopener"
-            aria-label={t("footerLinkedinLabel", {
-              defaultValue: "Follow us on LinkedIn",
-            })}
-          >
-            <LinkedinIcon className="size-4" />
-          </a>
-          <a
-            target="_blank"
-            href="https://github.com/lukevella/rallly"
-            className="text-gray-600 text-sm hover:text-primary hover:no-underline"
-            rel="noreferrer noopener"
-            aria-label={t("footerGithubLabel", {
-              defaultValue: "View our GitHub repository",
-            })}
-          >
-            <GithubIcon className="size-4" />
-          </a>
-        </div>
+        {/* Decorative, and there is no room for it beside the tagline until
+            the footer goes side by side, so it only shows from `lg` up. */}
+        <FooterDemo className="hidden w-full lg:flex lg:min-w-0 lg:flex-1" />
       </div>
-      <div className="grid grid-cols-1 gap-x-8 gap-y-12 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-x-8 gap-y-12 sm:grid-cols-2 lg:grid-cols-4">
         <div>
           <div className="mb-6 font-medium text-gray-800 text-sm uppercase tracking-wide">
             <Trans t={t} ns="common" i18nKey="product" defaults="Product" />
@@ -178,6 +184,31 @@ export const Footer = async ({ locale }: { locale: string }) => {
                   ns="common"
                   i18nKey="when2MeetAlternative"
                   defaults="When2Meet alternative"
+                />
+              </LinkBase>
+            </li>
+          </ul>
+        </div>
+        <div>
+          <div className="mb-6 font-medium text-gray-800 text-sm uppercase tracking-wide">
+            <Trans
+              t={t}
+              ns="common"
+              i18nKey="schedulingFor"
+              defaults="Scheduling for"
+            />
+          </div>
+          <ul className="grid gap-3 text-sm">
+            <li>
+              <LinkBase
+                className="inline-block font-normal text-gray-600 hover:text-gray-800 hover:no-underline"
+                href="/scheduling-for/executive-assistants"
+              >
+                <Trans
+                  t={t}
+                  ns="common"
+                  i18nKey="executiveAssistants"
+                  defaults="Executive assistants"
                 />
               </LinkBase>
             </li>

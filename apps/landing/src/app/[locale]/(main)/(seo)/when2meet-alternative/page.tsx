@@ -8,7 +8,7 @@ import { Trans } from "react-i18next/TransWithoutContext";
 import { PeopleBadge, PollsBadge } from "@/components/home/animated-number";
 import { Cta } from "@/components/home/cta";
 import { Faq, FaqItem } from "@/components/home/faq";
-import { Hero, HeroAnnouncement } from "@/components/home/hero";
+import { Hero } from "@/components/home/hero";
 import { HeroDemo } from "@/components/home/hero-demo/hero-demo";
 import { HowItWorks } from "@/components/home/how-it-works/how-it-works";
 import { Mention, Mentions } from "@/components/home/mentions";
@@ -44,26 +44,6 @@ export default async function Page(props: {
           description={t("when2meetAlternativeDescription", {
             ns: "home",
           })}
-          announcement={
-            <HeroAnnouncement
-              href="/blog/mobile-voting-redesign"
-              badge={
-                <Trans
-                  t={t}
-                  ns="home"
-                  i18nKey="mobileVotingBlogBadge"
-                  defaults="New"
-                />
-              }
-            >
-              <Trans
-                t={t}
-                ns="home"
-                i18nKey="mobileVotingBlog"
-                defaults="A clearer way to vote on your phone"
-              />
-            </HeroAnnouncement>
-          }
         >
           <HeroDemo locale={locale} />
         </Hero>
@@ -75,8 +55,8 @@ export default async function Page(props: {
             defaults="<0>{voterCount, plural, one {# person} other {# people}}</0> voted on <1>{pollCount, plural, one {# poll} other {# polls}}</1> in the last 30 days"
             values={{ voterCount, pollCount }}
             components={[
-              <PeopleBadge key="people" locale={locale} />,
-              <PollsBadge key="polls" locale={locale} />,
+              <PeopleBadge key="people" locale={locale} live />,
+              <PollsBadge key="polls" locale={locale} live />,
             ]}
           />
         </Stats>
