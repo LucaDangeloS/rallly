@@ -8,7 +8,7 @@ import { Trans } from "react-i18next/TransWithoutContext";
 import { PeopleBadge, PollsBadge } from "@/components/home/animated-number";
 import { Cta } from "@/components/home/cta";
 import { Faq, FaqItem } from "@/components/home/faq";
-import { Hero, HeroAnnouncement } from "@/components/home/hero";
+import { Hero } from "@/components/home/hero";
 import { HeroDemo } from "@/components/home/hero-demo/hero-demo";
 import { HowItWorks } from "@/components/home/how-it-works/how-it-works";
 import { Mention, Mentions } from "@/components/home/mentions";
@@ -29,7 +29,7 @@ export default async function Page(props: {
 }) {
   cacheLife("hours");
   const { locale } = await props.params;
-  const { t } = await getTranslation(locale, ["home", "common"]);
+  const { t } = await getTranslation(locale, ["home"]);
   const [pollCount, voterCount] = await Promise.all([
     getMonthlyPollCount(),
     getMonthlyVoterCount(),
@@ -38,37 +38,17 @@ export default async function Page(props: {
     <div className="divide-y">
       <Section>
         <Hero
-          title={t("headline", {
-            defaultValue: "Find the best time to meet",
+          title={t("sportsClubsTitle", {
             ns: "home",
+            defaultValue: "Scheduling for sports clubs and teams",
           })}
-          description={t("subheading", {
+          description={t("sportsClubsDescription", {
+            ns: "home",
             defaultValue:
-              "Create a poll, share the link, and let everyone vote on the times that work. It's free and nobody needs an account.",
-            ns: "home",
+              "Find out which nights your squad can actually make. Share one link with players, parents and coaches, see the numbers for every session, and book the pitch once. Free, with no limit on how many people you ask.",
           })}
-          announcement={
-            <HeroAnnouncement
-              href="/blog/mobile-voting-redesign"
-              badge={
-                <Trans
-                  t={t}
-                  ns="home"
-                  i18nKey="mobileVotingBlogBadge"
-                  defaults="New"
-                />
-              }
-            >
-              <Trans
-                t={t}
-                ns="home"
-                i18nKey="mobileVotingBlog"
-                defaults="A clearer way to vote on your phone"
-              />
-            </HeroAnnouncement>
-          }
         >
-          <HeroDemo locale={locale} />
+          <HeroDemo locale={locale} preset="sportsClub" />
         </Hero>
         <Stats className="mt-8 sm:mt-24">
           <Trans
@@ -78,8 +58,8 @@ export default async function Page(props: {
             defaults="<0>{voterCount, plural, one {# person} other {# people}}</0> voted on <1>{pollCount, plural, one {# poll} other {# polls}}</1> in the last 30 days"
             values={{ voterCount, pollCount }}
             components={[
-              <PeopleBadge key="people" locale={locale} live />,
-              <PollsBadge key="polls" locale={locale} live />,
+              <PeopleBadge key="people" locale={locale} />,
+              <PollsBadge key="polls" locale={locale} />,
             ]}
           />
         </Stats>
@@ -233,16 +213,16 @@ export default async function Page(props: {
                   <Trans
                     t={t}
                     ns="home"
-                    i18nKey="faqWhatIsRallly"
-                    defaults="What is Rallly?"
+                    i18nKey="sportsClubsFaqSquadSize"
+                    defaults="How many players can I include?"
                   />
                 }
               >
                 <Trans
                   t={t}
                   ns="home"
-                  i18nKey="faqWhatIsRalllyAnswer"
-                  defaults="Rallly is a meeting scheduling tool. You create a poll with a few proposed times, share a link, and participants vote on the times that work for them. When the votes are in, you can see at a glance which time suits everyone best."
+                  i18nKey="sportsClubsFaqSquadSizeAnswer"
+                  defaults="There is no limit on how many people you invite, so a full squad, the coaching staff and reserves can all respond to the same poll. Every session shows a running count, so you can see immediately which nights you have the numbers for."
                 />
               </FaqItem>
               <FaqItem
@@ -250,16 +230,16 @@ export default async function Page(props: {
                   <Trans
                     t={t}
                     ns="home"
-                    i18nKey="faqNeedAccount"
-                    defaults="Do I need an account to use Rallly?"
+                    i18nKey="sportsClubsFaqParents"
+                    defaults="Can parents respond on behalf of their child?"
                   />
                 }
               >
                 <Trans
                   t={t}
                   ns="home"
-                  i18nKey="faqNeedAccountAnswer"
-                  defaults="No. You can create a poll and vote on one without signing up. Creating a free account lets you manage your polls from any device and get notified when people respond."
+                  i18nKey="sportsClubsFaqParentsAnswer"
+                  defaults="Yes. Whoever opens the link enters a name and marks the sessions, so a parent can reply for their child, and one parent can respond for siblings by adding each of them separately. Nobody needs an account or an email address to take part."
                 />
               </FaqItem>
               <FaqItem
@@ -267,16 +247,50 @@ export default async function Page(props: {
                   <Trans
                     t={t}
                     ns="home"
-                    i18nKey="faqIsFree"
-                    defaults="Is Rallly free?"
+                    i18nKey="sportsClubsFaqNoApp"
+                    defaults="Do players need to download an app or sign up?"
                   />
                 }
               >
                 <Trans
                   t={t}
                   ns="home"
-                  i18nKey="faqIsFreeAnswer"
-                  defaults="Yes. 99% of people use Rallly completely free. Creating polls, sharing them, and collecting votes costs nothing and there is no limit on participants. We also offer <0>Rallly Pro</0>, a paid subscription with features that are useful if you use Rallly professionally, like adding your own branding, removing Rallly attribution from your polls, and keeping polls around indefinitely."
+                  i18nKey="sportsClubsFaqNoAppAnswer"
+                  defaults="No. Anyone with the link can respond straight from their phone browser, which matters when you are sharing it into a team group chat. Only you, as the organizer, need an account, and creating one is free."
+                />
+              </FaqItem>
+              <FaqItem
+                question={
+                  <Trans
+                    t={t}
+                    ns="home"
+                    i18nKey="sportsClubsFaqRepeat"
+                    defaults="Can I reuse it for next season or the next block?"
+                  />
+                }
+              >
+                <Trans
+                  t={t}
+                  ns="home"
+                  i18nKey="sportsClubsFaqRepeatAnswer"
+                  defaults="Yes. Most clubs run a fresh poll for each block of sessions, offering the dates the pitch or hall is available and letting the squad pick. Each block is its own poll, so last season's replies never get confused with this one."
+                />
+              </FaqItem>
+              <FaqItem
+                question={
+                  <Trans
+                    t={t}
+                    ns="home"
+                    i18nKey="sportsClubsFaqBranding"
+                    defaults="Can polls carry our club badge?"
+                  />
+                }
+              >
+                <Trans
+                  t={t}
+                  ns="home"
+                  i18nKey="sportsClubsFaqBrandingAnswer"
+                  defaults="With <0>Rallly Pro</0> you can add your own logo and colours and remove Rallly attribution, so a poll you send out looks like it came from the club. Everything else is free to use."
                   components={[
                     <Link
                       key="pricing"
@@ -284,40 +298,6 @@ export default async function Page(props: {
                       href="/pricing"
                     />,
                   ]}
-                />
-              </FaqItem>
-              <FaqItem
-                question={
-                  <Trans
-                    t={t}
-                    ns="home"
-                    i18nKey="faqTimeZones"
-                    defaults="Does Rallly work across time zones?"
-                  />
-                }
-              >
-                <Trans
-                  t={t}
-                  ns="home"
-                  i18nKey="faqTimeZonesAnswer"
-                  defaults="Yes. When you create a poll with specific times, each participant sees the options in their own time zone automatically, so nobody has to do the math."
-                />
-              </FaqItem>
-              <FaqItem
-                question={
-                  <Trans
-                    t={t}
-                    ns="home"
-                    i18nKey="faqAfterVoting"
-                    defaults="What happens after everyone votes?"
-                  />
-                }
-              >
-                <Trans
-                  t={t}
-                  ns="home"
-                  i18nKey="faqAfterVotingAnswer"
-                  defaults="The results show which times work for the most people. With Rallly Pro you can finalize the poll, which notifies participants of the chosen time by email."
                 />
               </FaqItem>
               <FaqItem
@@ -353,16 +333,16 @@ export default async function Page(props: {
               <Trans
                 t={t}
                 ns="home"
-                i18nKey="finalCtaTitle"
-                defaults="Ready to find the best time to meet?"
+                i18nKey="sportsClubsFinalCtaTitle"
+                defaults="Ready to sort out the training schedule?"
               />
             }
             description={
               <Trans
                 t={t}
                 ns="home"
-                i18nKey="finalCtaDescription"
-                defaults="Set up your poll in under a minute. No account, no downloads, no chasing people for replies."
+                i18nKey="sportsClubsFinalCtaDescription"
+                defaults="Set up your poll in under a minute, send one link to the squad, and stop chasing replies in the group chat."
               />
             }
             buttonLabel={
@@ -395,14 +375,15 @@ export async function generateMetadata(props: {
   const { locale } = await props.params;
   const { t } = await getTranslation(locale, "home");
   return {
-    title: t("metaTitle", {
-      defaultValue: "Rallly: Free Group Meeting Scheduling Tool",
-      ns: "home",
-    }),
-    description: t("metaDescription", {
+    title: t("sportsClubsMetaTitle", {
       ns: "home",
       defaultValue:
-        "Rallly is the fastest and easiest scheduling and collaboration tool. Create a meeting poll in seconds, no login required.",
+        "Scheduling for Sports Clubs and Teams | Free Availability Poll",
+    }),
+    description: t("sportsClubsMetaDescription", {
+      ns: "home",
+      defaultValue:
+        "Rallly is a free scheduling tool for sports clubs, teams and coaches. Check squad availability for training and fixtures with one link. No account needed.",
     }),
   };
 }

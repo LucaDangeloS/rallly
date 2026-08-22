@@ -8,7 +8,7 @@ import { Trans } from "react-i18next/TransWithoutContext";
 import { PeopleBadge, PollsBadge } from "@/components/home/animated-number";
 import { Cta } from "@/components/home/cta";
 import { Faq, FaqItem } from "@/components/home/faq";
-import { Hero, HeroAnnouncement } from "@/components/home/hero";
+import { Hero } from "@/components/home/hero";
 import { HeroDemo } from "@/components/home/hero-demo/hero-demo";
 import { HowItWorks } from "@/components/home/how-it-works/how-it-works";
 import { Mention, Mentions } from "@/components/home/mentions";
@@ -29,7 +29,7 @@ export default async function Page(props: {
 }) {
   cacheLife("hours");
   const { locale } = await props.params;
-  const { t } = await getTranslation(locale, ["home", "common"]);
+  const { t } = await getTranslation(locale, ["home"]);
   const [pollCount, voterCount] = await Promise.all([
     getMonthlyPollCount(),
     getMonthlyVoterCount(),
@@ -38,37 +38,17 @@ export default async function Page(props: {
     <div className="divide-y">
       <Section>
         <Hero
-          title={t("headline", {
-            defaultValue: "Find the best time to meet",
+          title={t("legalTitle", {
             ns: "home",
+            defaultValue: "Scheduling for law firms and mediators",
           })}
-          description={t("subheading", {
+          description={t("legalDescription", {
+            ns: "home",
             defaultValue:
-              "Create a poll, share the link, and let everyone vote on the times that work. It's free and nobody needs an account.",
-            ns: "home",
+              "Find a date that suits both sides, the client and the neutral without a week of letters between offices. Share one link, see exactly who can attend each slot, and confirm the date. Free, and opposing counsel does not need an account.",
           })}
-          announcement={
-            <HeroAnnouncement
-              href="/blog/mobile-voting-redesign"
-              badge={
-                <Trans
-                  t={t}
-                  ns="home"
-                  i18nKey="mobileVotingBlogBadge"
-                  defaults="New"
-                />
-              }
-            >
-              <Trans
-                t={t}
-                ns="home"
-                i18nKey="mobileVotingBlog"
-                defaults="A clearer way to vote on your phone"
-              />
-            </HeroAnnouncement>
-          }
         >
-          <HeroDemo locale={locale} />
+          <HeroDemo locale={locale} preset="legal" />
         </Hero>
         <Stats className="mt-8 sm:mt-24">
           <Trans
@@ -78,8 +58,8 @@ export default async function Page(props: {
             defaults="<0>{voterCount, plural, one {# person} other {# people}}</0> voted on <1>{pollCount, plural, one {# poll} other {# polls}}</1> in the last 30 days"
             values={{ voterCount, pollCount }}
             components={[
-              <PeopleBadge key="people" locale={locale} live />,
-              <PollsBadge key="polls" locale={locale} live />,
+              <PeopleBadge key="people" locale={locale} />,
+              <PollsBadge key="polls" locale={locale} />,
             ]}
           />
         </Stats>
@@ -233,16 +213,16 @@ export default async function Page(props: {
                   <Trans
                     t={t}
                     ns="home"
-                    i18nKey="faqWhatIsRallly"
-                    defaults="What is Rallly?"
+                    i18nKey="legalFaqOpposingCounsel"
+                    defaults="Can opposing counsel respond without signing up?"
                   />
                 }
               >
                 <Trans
                   t={t}
                   ns="home"
-                  i18nKey="faqWhatIsRalllyAnswer"
-                  defaults="Rallly is a meeting scheduling tool. You create a poll with a few proposed times, share a link, and participants vote on the times that work for them. When the votes are in, you can see at a glance which time suits everyone best."
+                  i18nKey="legalFaqOpposingCounselAnswer"
+                  defaults="Yes. Anyone with the link can reply whether or not they use Rallly, and whichever system their own firm runs. That matters when you are coordinating across firms, because the other side has no reason to adopt a tool just to give you three dates."
                 />
               </FaqItem>
               <FaqItem
@@ -250,16 +230,16 @@ export default async function Page(props: {
                   <Trans
                     t={t}
                     ns="home"
-                    i18nKey="faqNeedAccount"
-                    defaults="Do I need an account to use Rallly?"
+                    i18nKey="legalFaqAllParties"
+                    defaults="Everyone has to attend, not just a majority. Does that work?"
                   />
                 }
               >
                 <Trans
                   t={t}
                   ns="home"
-                  i18nKey="faqNeedAccountAnswer"
-                  defaults="No. You can create a poll and vote on one without signing up. Creating a free account lets you manage your polls from any device and get notified when people respond."
+                  i18nKey="legalFaqAllPartiesAnswer"
+                  defaults="Yes. Every slot shows exactly who can attend and who cannot, rather than only a total, so you can find the dates where counsel for both sides, the clients and the neutral are all free, and rule out the ones where a required party said no."
                 />
               </FaqItem>
               <FaqItem
@@ -267,16 +247,16 @@ export default async function Page(props: {
                   <Trans
                     t={t}
                     ns="home"
-                    i18nKey="faqIsFree"
-                    defaults="Is Rallly free?"
+                    i18nKey="legalFaqConfidential"
+                    defaults="Will the poll reveal our client or matter details?"
                   />
                 }
               >
                 <Trans
                   t={t}
                   ns="home"
-                  i18nKey="faqIsFreeAnswer"
-                  defaults="Yes. 99% of people use Rallly completely free. Creating polls, sharing them, and collecting votes costs nothing and there is no limit on participants. We also offer <0>Rallly Pro</0>, a paid subscription with features that are useful if you use Rallly professionally, like adding your own branding, removing Rallly attribution from your polls, and keeping polls around indefinitely."
+                  i18nKey="legalFaqConfidentialAnswer"
+                  defaults="Only what you choose to put in it. Many firms title the poll by matter reference rather than by party name, and leave the description empty. With <0>Rallly Pro</0> you can also hide participant names, so one side cannot see who else was invited, and hide votes until someone has responded themselves."
                   components={[
                     <Link
                       key="pricing"
@@ -291,16 +271,16 @@ export default async function Page(props: {
                   <Trans
                     t={t}
                     ns="home"
-                    i18nKey="faqTimeZones"
-                    defaults="Does Rallly work across time zones?"
+                    i18nKey="legalFaqTimeZones"
+                    defaults="Does it handle parties in different jurisdictions?"
                   />
                 }
               >
                 <Trans
                   t={t}
                   ns="home"
-                  i18nKey="faqTimeZonesAnswer"
-                  defaults="Yes. When you create a poll with specific times, each participant sees the options in their own time zone automatically, so nobody has to do the math."
+                  i18nKey="legalFaqTimeZonesAnswer"
+                  defaults="Yes. Each participant sees the proposed slots in their own time zone automatically, so counsel in London and a client in New York are looking at the same slot without either of them converting anything by hand."
                 />
               </FaqItem>
               <FaqItem
@@ -308,16 +288,23 @@ export default async function Page(props: {
                   <Trans
                     t={t}
                     ns="home"
-                    i18nKey="faqAfterVoting"
-                    defaults="What happens after everyone votes?"
+                    i18nKey="legalFaqBranding"
+                    defaults="Can polls carry our firm branding?"
                   />
                 }
               >
                 <Trans
                   t={t}
                   ns="home"
-                  i18nKey="faqAfterVotingAnswer"
-                  defaults="The results show which times work for the most people. With Rallly Pro you can finalize the poll, which notifies participants of the chosen time by email."
+                  i18nKey="legalFaqBrandingAnswer"
+                  defaults="With <0>Rallly Pro</0> you can add your own logo and colours and remove Rallly attribution, so a poll you send to another firm or a client looks like it came from your practice. Everything else is free to use."
+                  components={[
+                    <Link
+                      key="pricing"
+                      className="text-gray-800 underline underline-offset-2 hover:text-gray-600"
+                      href="/pricing"
+                    />,
+                  ]}
                 />
               </FaqItem>
               <FaqItem
@@ -353,16 +340,16 @@ export default async function Page(props: {
               <Trans
                 t={t}
                 ns="home"
-                i18nKey="finalCtaTitle"
-                defaults="Ready to find the best time to meet?"
+                i18nKey="legalFinalCtaTitle"
+                defaults="Ready to get the date agreed?"
               />
             }
             description={
               <Trans
                 t={t}
                 ns="home"
-                i18nKey="finalCtaDescription"
-                defaults="Set up your poll in under a minute. No account, no downloads, no chasing people for replies."
+                i18nKey="legalFinalCtaDescription"
+                defaults="Set up your poll in under a minute, send one link to all parties, and stop trading availability by email."
               />
             }
             buttonLabel={
@@ -395,14 +382,15 @@ export async function generateMetadata(props: {
   const { locale } = await props.params;
   const { t } = await getTranslation(locale, "home");
   return {
-    title: t("metaTitle", {
-      defaultValue: "Rallly: Free Group Meeting Scheduling Tool",
-      ns: "home",
-    }),
-    description: t("metaDescription", {
+    title: t("legalMetaTitle", {
       ns: "home",
       defaultValue:
-        "Rallly is the fastest and easiest scheduling and collaboration tool. Create a meeting poll in seconds, no login required.",
+        "Scheduling for Law Firms and Mediators | Free Availability Poll",
+    }),
+    description: t("legalMetaDescription", {
+      ns: "home",
+      defaultValue:
+        "Rallly is a free scheduling tool for mediations, hearings and client conferences. Find a date that works for both sides with one link. No account needed to respond.",
     }),
   };
 }

@@ -8,7 +8,7 @@ import { Trans } from "react-i18next/TransWithoutContext";
 import { PeopleBadge, PollsBadge } from "@/components/home/animated-number";
 import { Cta } from "@/components/home/cta";
 import { Faq, FaqItem } from "@/components/home/faq";
-import { Hero, HeroAnnouncement } from "@/components/home/hero";
+import { Hero } from "@/components/home/hero";
 import { HeroDemo } from "@/components/home/hero-demo/hero-demo";
 import { HowItWorks } from "@/components/home/how-it-works/how-it-works";
 import { Mention, Mentions } from "@/components/home/mentions";
@@ -29,7 +29,7 @@ export default async function Page(props: {
 }) {
   cacheLife("hours");
   const { locale } = await props.params;
-  const { t } = await getTranslation(locale, ["home", "common"]);
+  const { t } = await getTranslation(locale, ["home"]);
   const [pollCount, voterCount] = await Promise.all([
     getMonthlyPollCount(),
     getMonthlyVoterCount(),
@@ -38,37 +38,17 @@ export default async function Page(props: {
     <div className="divide-y">
       <Section>
         <Hero
-          title={t("headline", {
-            defaultValue: "Find the best time to meet",
+          title={t("committeesTitle", {
             ns: "home",
+            defaultValue: "Scheduling for committees and boards",
           })}
-          description={t("subheading", {
+          description={t("committeesDescription", {
+            ns: "home",
             defaultValue:
-              "Create a poll, share the link, and let everyone vote on the times that work. It's free and nobody needs an account.",
-            ns: "home",
+              "Find a date the whole committee can make without a chain of reply-all emails. Share one link, watch the responses come in, and confirm the meeting once you know you have quorum. Free, and members do not need an account.",
           })}
-          announcement={
-            <HeroAnnouncement
-              href="/blog/mobile-voting-redesign"
-              badge={
-                <Trans
-                  t={t}
-                  ns="home"
-                  i18nKey="mobileVotingBlogBadge"
-                  defaults="New"
-                />
-              }
-            >
-              <Trans
-                t={t}
-                ns="home"
-                i18nKey="mobileVotingBlog"
-                defaults="A clearer way to vote on your phone"
-              />
-            </HeroAnnouncement>
-          }
         >
-          <HeroDemo locale={locale} />
+          <HeroDemo locale={locale} preset="committee" />
         </Hero>
         <Stats className="mt-8 sm:mt-24">
           <Trans
@@ -78,8 +58,8 @@ export default async function Page(props: {
             defaults="<0>{voterCount, plural, one {# person} other {# people}}</0> voted on <1>{pollCount, plural, one {# poll} other {# polls}}</1> in the last 30 days"
             values={{ voterCount, pollCount }}
             components={[
-              <PeopleBadge key="people" locale={locale} live />,
-              <PollsBadge key="polls" locale={locale} live />,
+              <PeopleBadge key="people" locale={locale} />,
+              <PollsBadge key="polls" locale={locale} />,
             ]}
           />
         </Stats>
@@ -233,16 +213,16 @@ export default async function Page(props: {
                   <Trans
                     t={t}
                     ns="home"
-                    i18nKey="faqWhatIsRallly"
-                    defaults="What is Rallly?"
+                    i18nKey="committeesFaqQuorum"
+                    defaults="How do I tell whether we will have quorum?"
                   />
                 }
               >
                 <Trans
                   t={t}
                   ns="home"
-                  i18nKey="faqWhatIsRalllyAnswer"
-                  defaults="Rallly is a meeting scheduling tool. You create a poll with a few proposed times, share a link, and participants vote on the times that work for them. When the votes are in, you can see at a glance which time suits everyone best."
+                  i18nKey="committeesFaqQuorumAnswer"
+                  defaults="Every date shows a running count of how many members can make it, alongside who said yes, who said if need be and who said no. You can see at a glance which dates clear your quorum threshold and which fall short, so you confirm the meeting knowing it can go ahead."
                 />
               </FaqItem>
               <FaqItem
@@ -250,16 +230,16 @@ export default async function Page(props: {
                   <Trans
                     t={t}
                     ns="home"
-                    i18nKey="faqNeedAccount"
-                    defaults="Do I need an account to use Rallly?"
+                    i18nKey="committeesFaqRecurring"
+                    defaults="Can I use it for a meeting we hold every term?"
                   />
                 }
               >
                 <Trans
                   t={t}
                   ns="home"
-                  i18nKey="faqNeedAccountAnswer"
-                  defaults="No. You can create a poll and vote on one without signing up. Creating a free account lets you manage your polls from any device and get notified when people respond."
+                  i18nKey="committeesFaqRecurringAnswer"
+                  defaults="Yes. Many committees run one poll per cycle, offering the handful of dates that suit the chair and letting members pick. Each round is its own poll, so you keep a clear record of what was offered and who responded each time."
                 />
               </FaqItem>
               <FaqItem
@@ -267,16 +247,50 @@ export default async function Page(props: {
                   <Trans
                     t={t}
                     ns="home"
-                    i18nKey="faqIsFree"
-                    defaults="Is Rallly free?"
+                    i18nKey="committeesFaqExternalMembers"
+                    defaults="Can external trustees and co-opted members respond?"
                   />
                 }
               >
                 <Trans
                   t={t}
                   ns="home"
-                  i18nKey="faqIsFreeAnswer"
-                  defaults="Yes. 99% of people use Rallly completely free. Creating polls, sharing them, and collecting votes costs nothing and there is no limit on participants. We also offer <0>Rallly Pro</0>, a paid subscription with features that are useful if you use Rallly professionally, like adding your own branding, removing Rallly attribution from your polls, and keeping polls around indefinitely."
+                  i18nKey="committeesFaqExternalMembersAnswer"
+                  defaults="Yes. Anyone with the link can reply whether or not they use Rallly, and whichever calendar system their own organization runs. There is no limit on how many members you invite, so trustees, co-opted members and advisers all respond the same way."
+                />
+              </FaqItem>
+              <FaqItem
+                question={
+                  <Trans
+                    t={t}
+                    ns="home"
+                    i18nKey="committeesFaqRecord"
+                    defaults="Do I get a record of who was asked?"
+                  />
+                }
+              >
+                <Trans
+                  t={t}
+                  ns="home"
+                  i18nKey="committeesFaqRecordAnswer"
+                  defaults="The poll shows every participant and how they responded, so you have a clear record of who was invited and who replied when you come to write the minutes. You can also add a member and fill in their availability yourself if they send you their dates directly."
+                />
+              </FaqItem>
+              <FaqItem
+                question={
+                  <Trans
+                    t={t}
+                    ns="home"
+                    i18nKey="committeesFaqBranding"
+                    defaults="Can polls carry our organization branding?"
+                  />
+                }
+              >
+                <Trans
+                  t={t}
+                  ns="home"
+                  i18nKey="committeesFaqBrandingAnswer"
+                  defaults="With <0>Rallly Pro</0> you can add your own logo and colours and remove Rallly attribution, so a poll you send to a board looks like it came from your organization. Everything else is free to use."
                   components={[
                     <Link
                       key="pricing"
@@ -284,40 +298,6 @@ export default async function Page(props: {
                       href="/pricing"
                     />,
                   ]}
-                />
-              </FaqItem>
-              <FaqItem
-                question={
-                  <Trans
-                    t={t}
-                    ns="home"
-                    i18nKey="faqTimeZones"
-                    defaults="Does Rallly work across time zones?"
-                  />
-                }
-              >
-                <Trans
-                  t={t}
-                  ns="home"
-                  i18nKey="faqTimeZonesAnswer"
-                  defaults="Yes. When you create a poll with specific times, each participant sees the options in their own time zone automatically, so nobody has to do the math."
-                />
-              </FaqItem>
-              <FaqItem
-                question={
-                  <Trans
-                    t={t}
-                    ns="home"
-                    i18nKey="faqAfterVoting"
-                    defaults="What happens after everyone votes?"
-                  />
-                }
-              >
-                <Trans
-                  t={t}
-                  ns="home"
-                  i18nKey="faqAfterVotingAnswer"
-                  defaults="The results show which times work for the most people. With Rallly Pro you can finalize the poll, which notifies participants of the chosen time by email."
                 />
               </FaqItem>
               <FaqItem
@@ -353,16 +333,16 @@ export default async function Page(props: {
               <Trans
                 t={t}
                 ns="home"
-                i18nKey="finalCtaTitle"
-                defaults="Ready to find the best time to meet?"
+                i18nKey="committeesFinalCtaTitle"
+                defaults="Ready to get the next meeting scheduled?"
               />
             }
             description={
               <Trans
                 t={t}
                 ns="home"
-                i18nKey="finalCtaDescription"
-                defaults="Set up your poll in under a minute. No account, no downloads, no chasing people for replies."
+                i18nKey="committeesFinalCtaDescription"
+                defaults="Set up your poll in under a minute, send one link to the members, and stop counting replies by hand."
               />
             }
             buttonLabel={
@@ -395,14 +375,15 @@ export async function generateMetadata(props: {
   const { locale } = await props.params;
   const { t } = await getTranslation(locale, "home");
   return {
-    title: t("metaTitle", {
-      defaultValue: "Rallly: Free Group Meeting Scheduling Tool",
-      ns: "home",
-    }),
-    description: t("metaDescription", {
+    title: t("committeesMetaTitle", {
       ns: "home",
       defaultValue:
-        "Rallly is the fastest and easiest scheduling and collaboration tool. Create a meeting poll in seconds, no login required.",
+        "Scheduling for Committees and Boards | Free Meeting Poll Tool",
+    }),
+    description: t("committeesMetaDescription", {
+      ns: "home",
+      defaultValue:
+        "Rallly is a free scheduling tool for committees, boards and trustees. Find a date that reaches quorum with one link. No account needed to respond.",
     }),
   };
 }
