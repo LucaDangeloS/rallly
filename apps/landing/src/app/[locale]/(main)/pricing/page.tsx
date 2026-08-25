@@ -18,7 +18,15 @@ import {
 import { cacheLife } from "next/cache";
 import Link from "next/link";
 import { Trans } from "react-i18next/TransWithoutContext";
-
+import {
+  CompareTable,
+  CompareTableCell,
+  CompareTableCheck,
+  CompareTableDash,
+  CompareTableFeature,
+  CompareTableHead,
+  CompareTableTooltip,
+} from "@/components/compare-table";
 import { PeopleBadge, PollsBadge } from "@/components/home/animated-number";
 import { Cta } from "@/components/home/cta";
 import { Faq, FaqItem } from "@/components/home/faq";
@@ -32,24 +40,15 @@ import {
   SectionTitle,
 } from "@/components/section";
 import { getTranslation } from "@/i18n/server";
+import { getAlternates } from "@/lib/alternates";
 import { getMonthlyPollCount, getMonthlyVoterCount } from "@/lib/data";
 import { linkToApp } from "@/lib/linkToApp";
-
 import {
   BillingIntervalPrice,
   BillingIntervalProvider,
   BillingIntervalSwitch,
   BillingIntervalValue,
 } from "./billing-interval";
-import {
-  CompareTable,
-  CompareTableCell,
-  CompareTableCheck,
-  CompareTableDash,
-  CompareTableFeature,
-  CompareTableHead,
-  CompareTableTooltip,
-} from "./compare-table";
 import {
   PlanBenefit,
   PlanBenefitName,
@@ -71,7 +70,7 @@ const faqLinkClassName =
 export default async function Page(props: {
   params: Promise<{ locale: string }>;
 }) {
-  cacheLife("days");
+  cacheLife("hours");
   const { locale } = await props.params;
   const { t } = await getTranslation(locale, ["common", "pricing", "home"]);
   const [pollCount, voterCount] = await Promise.all([
@@ -933,6 +932,7 @@ export async function generateMetadata(props: {
   const { locale } = await props.params;
   const { t } = await getTranslation(locale, ["common", "pricing"]);
   return {
+    alternates: getAlternates({ locale, path: "/pricing" }),
     title: t("pricing", { ns: "common", defaultValue: "Pricing" }),
     description: t("pricingDescription", {
       ns: "pricing",
