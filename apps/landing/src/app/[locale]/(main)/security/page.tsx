@@ -4,13 +4,13 @@ import { buttonVariants } from "@rallly/ui";
 import {
   ActivityIcon,
   ArrowRightIcon,
+  CodeIcon,
   DatabaseIcon,
   EyeOffIcon,
   LockIcon,
   ServerIcon,
 } from "lucide-react";
 import { cacheLife } from "next/cache";
-import GithubIcon from "@/assets/github.svg";
 import { PeopleBadge, PollsBadge } from "@/components/home/animated-number";
 import { Faq, FaqItem } from "@/components/home/faq";
 import { Hero } from "@/components/home/hero";
@@ -60,6 +60,25 @@ function SecurityFeature({
   );
 }
 
+function TransferMechanismCell({
+  href,
+  fallback,
+  children,
+}: {
+  href: string;
+  fallback: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <td>
+      <a href={href} target="_blank" rel="noreferrer noopener">
+        {children}
+      </a>
+      <div className="mt-0.5 text-gray-500 text-xs">{fallback}</div>
+    </td>
+  );
+}
+
 export default async function Security(props: {
   params: Promise<{ locale: string }>;
 }) {
@@ -101,7 +120,7 @@ export default async function Security(props: {
         <SectionContent>
           <div className="grid gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
             <SecurityFeature
-              icon={<GithubIcon className="size-4" />}
+              icon={<CodeIcon className="size-4" />}
               title="Open source"
               link={{
                 label: "Browse source code",
@@ -168,13 +187,16 @@ export default async function Security(props: {
           </SectionDescription>
         </SectionHeading>
         <SectionContent>
-          <div className="longform max-w-2xl">
-            <table>
+          <div className="longform overflow-x-auto">
+            {/* Below lg the table is wider than the viewport: keep cells on
+                one line and let the wrapper scroll instead of wrapping */}
+            <table className="whitespace-nowrap lg:whitespace-normal">
               <thead>
                 <tr>
                   <th>Provider</th>
                   <th>Purpose</th>
                   <th>Location</th>
+                  <th>Transfer mechanism</th>
                 </tr>
               </thead>
               <tbody>
@@ -191,6 +213,12 @@ export default async function Security(props: {
                   </td>
                   <td>Application hosting</td>
                   <td>United States</td>
+                  <TransferMechanismCell
+                    href="https://vercel.com/legal/dpa"
+                    fallback="SCCs fallback"
+                  >
+                    EU-US DPF + UK Extension
+                  </TransferMechanismCell>
                 </tr>
                 <tr>
                   <td>
@@ -205,6 +233,12 @@ export default async function Security(props: {
                   </td>
                   <td>Managed PostgreSQL database</td>
                   <td>United States</td>
+                  <TransferMechanismCell
+                    href="https://www.digitalocean.com/legal/data-processing-agreement"
+                    fallback="SCCs + UK Addendum fallback"
+                  >
+                    EU-US DPF + UK Extension
+                  </TransferMechanismCell>
                 </tr>
                 <tr>
                   <td>
@@ -219,6 +253,12 @@ export default async function Security(props: {
                   </td>
                   <td>Session data, rate limiting</td>
                   <td>United States</td>
+                  <TransferMechanismCell
+                    href="https://upstash.com/trust/dpa.pdf"
+                    fallback="SCCs + UK Addendum fallback"
+                  >
+                    EU-US DPF + UK Extension
+                  </TransferMechanismCell>
                 </tr>
                 <tr>
                   <td>
@@ -233,6 +273,12 @@ export default async function Security(props: {
                   </td>
                   <td>Transactional email, object storage</td>
                   <td>United States</td>
+                  <TransferMechanismCell
+                    href="https://d1.awsstatic.com/legal/aws-gdpr/AWS_GDPR_DPA.pdf"
+                    fallback="Certified under Amazon.com, Inc. · SCCs fallback"
+                  >
+                    EU-US DPF + UK Extension
+                  </TransferMechanismCell>
                 </tr>
                 <tr>
                   <td>
@@ -247,6 +293,12 @@ export default async function Security(props: {
                   </td>
                   <td>Payment processing (billing contact data only)</td>
                   <td>United States</td>
+                  <TransferMechanismCell
+                    href="https://stripe.com/legal/dpa"
+                    fallback="SCCs + UK Addendum fallback"
+                  >
+                    EU-US DPF + UK Extension
+                  </TransferMechanismCell>
                 </tr>
                 <tr>
                   <td>
@@ -261,6 +313,12 @@ export default async function Security(props: {
                   </td>
                   <td>Product analytics</td>
                   <td>European Union</td>
+                  <TransferMechanismCell
+                    href="https://posthog.com/privacy"
+                    fallback="No US transfer"
+                  >
+                    EU data residency
+                  </TransferMechanismCell>
                 </tr>
                 <tr>
                   <td>
@@ -275,6 +333,12 @@ export default async function Security(props: {
                   </td>
                   <td>Error monitoring</td>
                   <td>United States</td>
+                  <TransferMechanismCell
+                    href="https://sentry.io/legal/dpa/"
+                    fallback="SCCs + UK Addendum fallback"
+                  >
+                    EU-US DPF + UK Extension
+                  </TransferMechanismCell>
                 </tr>
               </tbody>
             </table>
@@ -301,12 +365,13 @@ export default async function Security(props: {
             </FaqItem>
             <FaqItem question="How long do you keep data, and can we delete it?">
               Data is retained while your account is active. You can delete
-              polls and your account at any time, and account deletion takes
-              effect immediately. Inactive polls are automatically scheduled for
+              polls and your account at any time. Account deletion starts a 7
+              day recovery window, after which your data is permanently erased
+              and remaining backup copies expire on our database provider&apos;s
+              retention schedule. Inactive polls are automatically scheduled for
               deletion with a 30 day grace period and advance notice. On
               request, we delete an organization&apos;s data and confirm
-              deletion in writing, and your data is exportable in standard
-              formats at any time.
+              deletion in writing.
             </FaqItem>
             <FaqItem question="Do you hold SOC 2 or ISO 27001 certification?">
               Not currently. Our infrastructure providers are SOC 2 Type 2
