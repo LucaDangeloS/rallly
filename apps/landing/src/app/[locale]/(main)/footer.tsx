@@ -201,7 +201,7 @@ export const Footer = async ({ locale }: { locale: string }) => {
                   t={t}
                   ns="common"
                   i18nKey="when2MeetAlternative"
-                  defaults="When2Meet alternative"
+                  defaults="When2meet alternative"
                 />
               </LinkBase>
             </li>
@@ -308,6 +308,14 @@ export const Footer = async ({ locale }: { locale: string }) => {
                 className="inline-block font-normal text-gray-600 hover:text-gray-800 hover:no-underline"
               >
                 <Trans t={t} ns="common" i18nKey="termsOfUse" />
+              </LinkBase>
+            </li>
+            <li>
+              <LinkBase
+                href="/dpa"
+                className="inline-block font-normal text-gray-600 hover:text-gray-800 hover:no-underline"
+              >
+                <Trans t={t} ns="common" i18nKey="dpa" defaults="DPA" />
               </LinkBase>
             </li>
           </ul>

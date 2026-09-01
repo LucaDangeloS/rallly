@@ -1,17 +1,15 @@
 "use cache";
 
 import { cacheLife } from "next/cache";
+import { LegalPageLayout } from "@/components/legal-page-layout";
 import { Section } from "@/components/section";
+import { LinkBase } from "@/i18n/client/link";
 
 export default async function PrivacyPolicy() {
   cacheLife("max");
   return (
     <Section>
-      <h1 className="max-w-2xl text-balance font-medium text-3xl text-gray-800 tracking-tight sm:text-4xl">
-        Privacy policy
-      </h1>
-      <p className="mt-4 text-gray-500 text-sm">Last updated: 30 August 2026</p>
-      <div className="longform mt-8 max-w-2xl">
+      <LegalPageLayout title="Privacy policy" lastUpdated="2026-09-01">
         <p>
           At rallly.co, we take your privacy seriously. This privacy policy
           explains how we collect, use, and disclose your personal data, and
@@ -137,6 +135,16 @@ export default async function PrivacyPolicy() {
           a seamless transition between the two services.
         </p>
 
+        <h2>Processing on behalf of organizations</h2>
+
+        <p>
+          Where we process personal data on behalf of an organization using
+          Rallly, for example the details of people invited to that
+          organization&apos;s polls and events, we act as a processor and that
+          processing is governed by our{" "}
+          <LinkBase href="/dpa">Data Processing Agreement</LinkBase>.
+        </p>
+
         <h2>Your rights</h2>
 
         <p>You have the following rights in relation to your personal data:</p>
@@ -181,7 +189,7 @@ export default async function PrivacyPolicy() {
           practices with regards to your personal data, please contact us at{" "}
           <a href="mailto:support@rallly.co">support@rallly.co</a>.
         </p>
-      </div>
+      </LegalPageLayout>
     </Section>
   );
 }
