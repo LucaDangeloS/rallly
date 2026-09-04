@@ -9,6 +9,7 @@ import { getInstanceBranding, getSpaceBranding } from "@/emails/branding";
 import { resolveSpaceTier } from "@/features/billing/utils";
 import { recordPollActivities } from "@/features/poll/activity/mutations";
 import { MAX_POLL_INVITES_PER_DAY } from "@/features/poll/invite/constants";
+import { getPollInvitePath } from "@/features/poll/invite/utils";
 
 const logger = createLogger("poll/invite/mutations");
 
@@ -189,7 +190,7 @@ export async function sendPollInvite({
       props: {
         hostName: sender.name,
         pollTitle: poll.title,
-        inviteUrl: absoluteUrl(`/invite/${pollId}?invite=${token}`),
+        inviteUrl: absoluteUrl(getPollInvitePath({ pollId, token })),
       },
     });
   } catch (error) {
@@ -313,5 +314,63 @@ export async function recordPollInviteOpen({
     ]);
 
     return true;
+  });
+}
+
+export type RevokePollInviteResult =
+  | { ok: true }
+  | { ok: false; reason: "notFound" | "alreadyResponded" };
+
+/**
+ * Removes a pending invite from the host's list. The row is kept and
+ * stamped rather than deleted so its token stops resolving and a later
+ * re-invite reactivates it with a fresh token. A converted invite belongs
+ * to the response, so it is refused here; the host removes the response
+ * instead. The claim on `revokedAt IS NULL` serialises concurrent removes
+ * so the activity event is written once.
+ */
+export async function revokePollInvite({
+  pollId,
+  inviteId,
+  userId,
+}: {
+  pollId: string;
+  inviteId: string;
+  userId: string;
+}): Promise<RevokePollInviteResult> {
+  return prisma.$transaction(async (tx) => {
+    const invite = await tx.pollInvite.findFirst({
+      where: { id: inviteId, pollId, revokedAt: null },
+      select: { id: true, email: true, participantId: true },
+    });
+
+    if (!invite) {
+      return { ok: false, reason: "notFound" };
+    }
+
+    if (invite.participantId) {
+      return { ok: false, reason: "alreadyResponded" };
+    }
+
+    const { count } = await tx.pollInvite.updateMany({
+      where: { id: invite.id, revokedAt: null, participantId: null },
+      data: { revokedAt: new Date() },
+    });
+
+    if (count === 0) {
+      return { ok: false, reason: "notFound" };
+    }
+
+    await recordPollActivities(tx, [
+      {
+        pollId,
+        type: "invite_revoked",
+        userId,
+        inviteId: invite.id,
+        payload: { email: invite.email },
+      },
+    ]);
+
+    return { ok: true };
   });
 }
