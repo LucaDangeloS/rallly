@@ -9,7 +9,7 @@ import {
   ClockIcon,
   CopyIcon,
   EyeOffIcon,
-  LifeBuoyIcon,
+  MailPlusIcon,
   PaletteIcon,
   Settings2Icon,
   TimerResetIcon,
@@ -310,6 +310,25 @@ export default async function Page(props: {
                     />
                   </PlanBenefitTooltip>
                 </PlanBenefit>
+                <PlanBenefit icon={<MailPlusIcon />}>
+                  <PlanBenefitTooltip
+                    content={
+                      <Trans
+                        t={t}
+                        ns="pricing"
+                        i18nKey="emailInvitesDescription"
+                        defaults="Invite people by email and see who has responded"
+                      />
+                    }
+                  >
+                    <Trans
+                      t={t}
+                      ns="pricing"
+                      i18nKey="emailInvites"
+                      defaults="Email invites"
+                    />
+                  </PlanBenefitTooltip>
+                </PlanBenefit>
                 <PlanBenefit icon={<EyeOffIcon />}>
                   <PlanBenefitTooltip
                     content={
@@ -412,16 +431,6 @@ export default async function Page(props: {
                       ns="pricing"
                       i18nKey="teamCollaboration"
                       defaults="Team collaboration"
-                    />
-                  </PlanBenefitName>
-                </PlanBenefit>
-                <PlanBenefit icon={<LifeBuoyIcon />}>
-                  <PlanBenefitName>
-                    <Trans
-                      t={t}
-                      ns="pricing"
-                      i18nKey="prioritySupport"
-                      defaults="Priority support"
                     />
                   </PlanBenefitName>
                 </PlanBenefit>
@@ -647,6 +656,33 @@ export default async function Page(props: {
               </tr>
               <tr>
                 <CompareTableFeature>
+                  <CompareTableTooltip
+                    content={
+                      <Trans
+                        t={t}
+                        ns="pricing"
+                        i18nKey="emailInvitesDescription"
+                        defaults="Invite people by email and see who has responded"
+                      />
+                    }
+                  >
+                    <Trans
+                      t={t}
+                      ns="pricing"
+                      i18nKey="emailInvites"
+                      defaults="Email invites"
+                    />
+                  </CompareTableTooltip>
+                </CompareTableFeature>
+                <CompareTableCell>
+                  <CompareTableDash label={notIncluded} />
+                </CompareTableCell>
+                <CompareTableCell>
+                  <CompareTableCheck label={included} />
+                </CompareTableCell>
+              </tr>
+              <tr>
+                <CompareTableFeature>
                   <Trans
                     t={t}
                     ns="pricing"
@@ -668,22 +704,6 @@ export default async function Page(props: {
                     ns="pricing"
                     i18nKey="teamCollaboration"
                     defaults="Team collaboration"
-                  />
-                </CompareTableFeature>
-                <CompareTableCell>
-                  <CompareTableDash label={notIncluded} />
-                </CompareTableCell>
-                <CompareTableCell>
-                  <CompareTableCheck label={included} />
-                </CompareTableCell>
-              </tr>
-              <tr>
-                <CompareTableFeature>
-                  <Trans
-                    t={t}
-                    ns="pricing"
-                    i18nKey="prioritySupport"
-                    defaults="Priority support"
                   />
                 </CompareTableFeature>
                 <CompareTableCell>
@@ -732,8 +752,25 @@ export default async function Page(props: {
                 <Trans
                   t={t}
                   ns="pricing"
-                  i18nKey="canUseFreeAnswer2"
-                  defaults="Yes, most of Rallly's features are free and many users will never need to pay for anything. However, there are some features that are only available to paying customers. These features are designed to help you get the most out of Rallly."
+                  i18nKey="canUseFreeAnswer3"
+                  defaults="Yes. The free plan is not a trial. You can create as many polls as you like, invite as many participants as you like, and use it for as long as you like without paying or adding a card. Paid plans add extra features such as keeping polls indefinitely and custom branding, but you will never be asked to pay to keep using the basics."
+                />
+              </FaqItem>
+              <FaqItem
+                question={
+                  <Trans
+                    t={t}
+                    ns="pricing"
+                    i18nKey="pollLimit"
+                    defaults="Is there a limit on how many polls I can create?"
+                  />
+                }
+              >
+                <Trans
+                  t={t}
+                  ns="pricing"
+                  i18nKey="pollLimitAnswer"
+                  defaults="No. There is no limit on the number of polls you can create or the number of people who can vote on them, on any plan. On the free plan, polls are deleted once all their dates have passed and there has been no activity for 30 days, and some features such as custom branding and advanced poll settings are only available on a paid plan. See the comparison table above for the full list."
                 />
               </FaqItem>
               <FaqItem
