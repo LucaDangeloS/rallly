@@ -49,9 +49,10 @@ export const env = createEnv({
     SMTP_SECURE: z.enum(["true", "false"]).optional(),
     SMTP_PORT: z.string().optional(),
     SMTP_REJECT_UNAUTHORIZED: z.enum(["true", "false"]).optional(),
-    SMTP_DEBUG: z.enum(["true", "false"]).optional(),
     /** @deprecated Use SMTP_REJECT_UNAUTHORIZED instead */
     SMTP_TLS_ENABLED: z.enum(["true", "false"]).optional(),
+    /** @deprecated No longer supported; send failures log the server response */
+    SMTP_DEBUG: z.enum(["true", "false"]).optional(),
     /**
      * AWS SES Configuration
      */
@@ -92,6 +93,12 @@ export const env = createEnv({
      * @default "false"
      */
     MODERATION_ENABLED: z.enum(["true", "false"]).default("false"),
+    /**
+     * Model that judges nonprofit discount applications. A bare id
+     * (`gpt-5.6-terra`) goes to OpenAI directly; `provider/model` goes
+     * through the Vercel AI Gateway.
+     */
+    NONPROFIT_VERIFIER_MODEL: z.string().optional(),
     /**
      * Comma-separated list of domains that trigger an automatic user ban
      */
@@ -247,8 +254,8 @@ export const env = createEnv({
     SMTP_SECURE: process.env.SMTP_SECURE,
     SMTP_PORT: process.env.SMTP_PORT,
     SMTP_REJECT_UNAUTHORIZED: process.env.SMTP_REJECT_UNAUTHORIZED,
-    SMTP_DEBUG: process.env.SMTP_DEBUG,
     SMTP_TLS_ENABLED: process.env.SMTP_TLS_ENABLED,
+    SMTP_DEBUG: process.env.SMTP_DEBUG,
     ALLOWED_EMAILS: process.env.ALLOWED_EMAILS,
     EMAIL_LOGIN_ENABLED: process.env.EMAIL_LOGIN_ENABLED,
     REGISTRATION_ENABLED: process.env.REGISTRATION_ENABLED,
@@ -272,6 +279,7 @@ export const env = createEnv({
     NOREPLY_EMAIL_NAME: process.env.NOREPLY_EMAIL_NAME,
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     MODERATION_ENABLED: process.env.MODERATION_ENABLED,
+    NONPROFIT_VERIFIER_MODEL: process.env.NONPROFIT_VERIFIER_MODEL,
     BANNED_DOMAINS: process.env.BANNED_DOMAINS,
     KV_REST_API_URL: process.env.KV_REST_API_URL,
     KV_REST_API_TOKEN: process.env.KV_REST_API_TOKEN,
