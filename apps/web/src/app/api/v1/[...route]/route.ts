@@ -17,7 +17,7 @@ import {
   getPollWithOptions,
   listPolls,
 } from "@/features/poll/data";
-import { closePoll, createPoll, deletePoll } from "@/features/poll/mutations";
+import { createPoll, deletePoll } from "@/features/poll/mutations";
 import { getSpaceMemberByEmail } from "@/features/space/member/data";
 import type { SpaceTier } from "@/features/space/schema";
 import type { AuthorizedSpaceId } from "@/features/space/types";
@@ -38,20 +38,15 @@ import {
   rateLimit,
 } from "../../middleware/rate-limit";
 import { wideEvent } from "../../middleware/wide-event";
-import {
-  createPollRequestExamples,
-  patchPollRequestExamples,
-} from "../examples";
+import { createPollRequestExamples } from "../examples";
 import {
   createPollInputSchema,
   deletePollSuccessResponseSchema,
   errorResponseSchema,
   getPollParticipantsSuccessResponseSchema,
   getPollResultsSuccessResponseSchema,
-  listParticipantsQuerySchema,
   listPollsQuerySchema,
   listPollsSuccessResponseSchema,
-  patchPollInputSchema,
   pollResponseSchema,
 } from "../schemas";
 
@@ -294,7 +289,7 @@ async function buildOpenApiSpec() {
           "",
           "## Lists",
           "",
-          "Every list endpoint returns the items in `data` and a `nextCursor` beside it. Pass `nextCursor` as the `cursor` query parameter to fetch the next page; it is `null` on the last page.",
+          "List endpoints return the items in `data`. `GET /polls` is paginated: it returns a `nextCursor` beside `data`; pass it as the `cursor` query parameter to fetch the next page, and it is `null` on the last page. `GET /polls/:pollId/participants` returns every participant in one response.",
           "",
           "## Errors",
           "",
@@ -307,13 +302,10 @@ async function buildOpenApiSpec() {
           "| 400 | `ORGANIZER_NOT_MEMBER` | The organizer email is not a member of the space |",
           "| 400 | `TOO_MANY_OPTIONS` | More than the maximum number of poll options |",
           "| 400 | `INAPPROPRIATE_CONTENT` | The title, description or location was flagged by content moderation |",
-          "| 400 | `DUPLICATE_DATES` | `options.dates` contains the same date more than once |",
-          "| 400 | `NO_OPTIONS_GENERATED` | No slot generator produced a valid time slot |",
           "| 401 | `UNAUTHORIZED` | The API key is missing, invalid, expired or revoked, or its owner is banned |",
           "| 403 | `SPACE_NOT_PRO` | The space behind the key has no Pro subscription |",
           "| 404 | `NOT_FOUND` | No route matches the method and path |",
           "| 404 | `POLL_NOT_FOUND` | The poll does not exist or belongs to another space |",
-          "| 422 | `TRANSITION_NOT_AVAILABLE` | The requested status change is not supported |",
           "| 429 | `RATE_LIMIT_EXCEEDED` | A rate limit window is exhausted |",
           "| 503 | `SERVICE_UNAVAILABLE` | Maintenance, or the rate limit store cannot be reached |",
           "| 500 | `INTERNAL_ERROR` | Unexpected failure; the request id is logged |",
@@ -345,15 +337,6 @@ async function buildOpenApiSpec() {
     }
   }
 
-  const patchPollRequestBody =
-    spec.paths["/v1/polls/{pollId}"]?.patch?.requestBody;
-  if (patchPollRequestBody && "content" in patchPollRequestBody) {
-    const media = patchPollRequestBody.content?.["application/json"];
-    if (media) {
-      media.examples = patchPollRequestExamples;
-    }
-  }
-
   return spec;
 }
 
@@ -372,64 +355,61 @@ app.post(
     tags: ["Polls"],
     summary: "Create a poll",
     description: [
-      "Creates a poll and responds with `201 Created` and the full poll, exactly as `GET /polls/:pollId` returns it. Share `inviteUrl` with participants. `options.kind` chooses what participants vote on: whole days or time slots. A poll has at most 100 options.",
+      "Creates a poll and responds with `201 Created` and the full poll, exactly as `GET /polls/:pollId` returns it. Share `inviteUrl` with participants. The request mirrors the response: `kind` chooses what participants vote on, and `options` takes the same shape the poll returns, so a poll can be recreated from the body of a `GET`. A poll has at most 100 options.",
       "",
       "## Date poll",
       "",
-      'Pass `kind: "date"` and `dates`, a list of `YYYY-MM-DD` values. Each becomes one all-day option. Dates are floating calendar days with no timezone, so never convert them through one. A repeated date fails with `DUPLICATE_DATES`.',
+      'Pass `kind: "date"` and `options`, one `{ "date": "YYYY-MM-DD" }` per day. Each becomes one all-day option. Dates are floating calendar days with no timezone, so never convert them through one. Duplicate dates are removed.',
       "",
       "```json",
       "{",
       '  "title": "Team offsite",',
-      '  "options": {',
-      '    "kind": "date",',
-      '    "dates": ["2027-03-01", "2027-03-02", "2027-03-03"]',
-      "  }",
+      '  "kind": "date",',
+      '  "options": [{ "date": "2027-03-01" }, { "date": "2027-03-02" }, { "date": "2027-03-03" }]',
       "}",
       "```",
       "",
       "## Time poll",
       "",
-      'Pass `kind: "time"` with a `duration` in minutes that every slot shares, the slots themselves as `times`, `generators` or both, and optionally a `timeZone` (an IANA zone the times are written in).',
+      'Pass `kind: "time"`, optionally a `timeZone` (an IANA zone the times are written in) and a default `duration` in minutes, and the slots as `options`, `generators` or both.',
       "",
-      "### Explicit times",
+      "### Explicit slots",
       "",
-      "Each ISO datetime string in `times` becomes one slot starting at that moment. A time with no offset, like `2027-03-01T09:00:00`, is wall clock time in `timeZone` when that is set and a floating time with no conversion otherwise; a time with an offset or `Z` is an absolute instant.",
+      "Each entry in `options` is one slot: a `startTime` and an optional `duration` that overrides the poll default. A `startTime` with no offset, like `2027-03-01T09:00:00`, is wall clock time in `timeZone` when that is set and a floating time with no conversion otherwise; one with an offset or `Z` is an absolute instant.",
       "",
       "```json",
       "{",
       '  "title": "Kickoff",',
-      '  "options": {',
-      '    "kind": "time",',
-      '    "duration": 60,',
-      '    "timeZone": "Europe/London",',
-      '    "times": ["2027-03-01T09:00:00", "2027-03-02T14:00:00"]',
-      "  }",
+      '  "kind": "time",',
+      '  "timeZone": "Europe/London",',
+      '  "duration": 60,',
+      '  "options": [',
+      '    { "startTime": "2027-03-01T09:00:00" },',
+      '    { "startTime": "2027-03-02T14:00:00", "duration": 90 }',
+      "  ]",
       "}",
       "```",
       "",
       "### Slot generators",
       "",
-      "Each object in `generators` expands into recurring slots from a schedule, so availability across days or weeks does not have to be listed slot by slot.",
+      "Each object in `generators` expands into recurring slots of `duration` minutes from a schedule, so availability across days or weeks does not have to be listed slot by slot. `duration` is required when `generators` is set.",
       "",
       "```json",
       "{",
       '  "title": "Interview availability",',
-      '  "options": {',
-      '    "kind": "time",',
-      '    "duration": 30,',
-      '    "timeZone": "America/New_York",',
-      '    "generators": [',
-      "      {",
-      '        "startDate": "2027-03-01",',
-      '        "endDate": "2027-03-05",',
-      '        "days": ["mon", "tue", "wed", "thu", "fri"],',
-      '        "startTime": "09:00",',
-      '        "endTime": "12:00",',
-      '        "interval": 60',
-      "      }",
-      "    ]",
-      "  }",
+      '  "kind": "time",',
+      '  "timeZone": "America/New_York",',
+      '  "duration": 30,',
+      '  "generators": [',
+      "    {",
+      '      "startDate": "2027-03-01",',
+      '      "endDate": "2027-03-05",',
+      '      "days": ["mon", "tue", "wed", "thu", "fri"],',
+      '      "from": "09:00",',
+      '      "to": "12:00",',
+      '      "interval": 60',
+      "    }",
+      "  ]",
       "}",
       "```",
       "",
@@ -438,12 +418,12 @@ app.post(
       "| Field | Meaning |",
       "| --- | --- |",
       "| `startDate`, `endDate` | The date range, inclusive. Fewer than 366 days. |",
-      "| `days` | Days of the week to include: `mon` to `sun`. Other days in the range are skipped. |",
-      "| `startTime` | Earliest slot start on each day, `HH:mm` in `timeZone`. |",
-      "| `endTime` | End of the daily window. A slot is only generated if it ends by this time. |",
+      "| `days` | Days of the week to include: `mon` to `sun`. Optional; defaults to every day. |",
+      "| `from` | Earliest slot start on each day, `HH:mm` in `timeZone`. |",
+      "| `to` | End of the daily window, `HH:mm` in `timeZone`. A slot is only generated if it ends by this time. Must be later than `from`. |",
       "| `interval` | Minutes between slot starts. Optional; defaults to `duration`, which gives back to back slots. |",
       "",
-      "Generators are expanded when the poll is created and duplicate slots are removed. A request that would exceed 100 options fails with `TOO_MANY_OPTIONS`; a generator whose window fits no slot produces nothing, and if nothing in `times` or `generators` yields a slot the request fails with `NO_OPTIONS_GENERATED`.",
+      "A generator that cannot produce a slot is rejected with `VALIDATION_ERROR` naming the field: `to` not later than `from`, a window shorter than `duration`, or a range that contains none of the listed days. Generators are expanded when the poll is created, the result is appended to `options`, and duplicate slots are removed. A request that would exceed 100 options fails with `TOO_MANY_OPTIONS`.",
     ].join("\n"),
     security: [{ bearerAuth: [] }],
     responses: {
@@ -456,7 +436,7 @@ app.post(
         },
       },
       400: {
-        description: "Invalid input or no valid options generated",
+        description: "Invalid input",
         content: {
           "application/json": {
             schema: resolver(errorResponseSchema),
@@ -545,6 +525,7 @@ app.post(
             title: poll.title,
             kind,
             source: "api",
+            apiVersion: "v1",
             optionCount: poll.options.length,
             hasLocation: !!poll.location,
             hasDescription: !!poll.description,
@@ -566,10 +547,8 @@ app.post(
       after(() => flushPostHog());
     };
 
-    const optionsInput = input.options;
-
-    if (optionsInput.kind === "date") {
-      const { dates } = optionsInput;
+    if (input.kind === "date") {
+      const dates = [...new Set(input.options.map((option) => option.date))];
       if (dates.length > MAX_POLL_OPTIONS) {
         return c.json(
           apiError(
@@ -580,19 +559,7 @@ app.post(
         );
       }
 
-      const uniqueDates = [...new Set(dates)];
-      if (uniqueDates.length < dates.length) {
-        const duplicateCount = dates.length - uniqueDates.length;
-        return c.json(
-          apiError(
-            "DUPLICATE_DATES",
-            `Duplicate dates found. Please remove ${duplicateCount} duplicate date${duplicateCount > 1 ? "s" : ""}.`,
-          ),
-          400,
-        );
-      }
-
-      const options = uniqueDates.map((date) => ({
+      const options = dates.map((date) => ({
         startTime: new Date(`${date}T00:00:00.000Z`),
         duration: 0,
       }));
@@ -616,33 +583,42 @@ app.post(
       return c.json(pollResponseSchema.parse(toPollResponseBody(poll)), 201);
     }
 
-    const timeZone = optionsInput.timeZone;
-    const duration = optionsInput.duration;
+    const { timeZone } = input;
+    // The schema guarantees a duration wherever it is read: every option
+    // without its own carries the poll default, and generators require it.
+    const defaultDuration = input.duration ?? 0;
 
     const timeSlots = [
-      ...(optionsInput.times ?? []).map((time) =>
-        parseStartTime(time, timeZone, duration),
+      ...(input.options ?? []).map((option) =>
+        parseStartTime(
+          option.startTime,
+          timeZone,
+          option.duration ?? defaultDuration,
+        ),
       ),
-      ...(optionsInput.generators ?? []).flatMap((generator) => {
+      ...(input.generators ?? []).flatMap((generator) => {
         const slotGenerator: SlotGeneratorInput = {
           startDate: generator.startDate,
           endDate: generator.endDate,
           daysOfWeek: generator.days,
-          fromTime: generator.startTime,
-          toTime: generator.endTime,
+          fromTime: generator.from,
+          toTime: generator.to,
           interval: generator.interval,
         };
-        return generateTimeSlots(slotGenerator, timeZone, duration);
+        return generateTimeSlots(slotGenerator, timeZone, defaultDuration);
       }),
     ];
 
     const options = dedupeTimeSlots(timeSlots);
 
+    // Unreachable for inputs the schema accepts; guards the poll against an
+    // expansion edge case (a window that vanishes on a DST change) rather
+    // than creating it empty.
     if (!options.length) {
       return c.json(
         apiError(
-          "NO_OPTIONS_GENERATED",
-          "No valid options were generated. Check that your slot generators produce valid time slots.",
+          "VALIDATION_ERROR",
+          "generators: no slot fits the daily window on any listed day.",
         ),
         400,
       );
@@ -789,84 +765,6 @@ app.get(
   },
 );
 
-app.patch(
-  "/polls/:pollId",
-  spaceApiKeyAuth,
-  rateLimit,
-  describeRoute({
-    tags: ["Polls"],
-    summary: "Update a poll",
-    description: [
-      'Updates a poll\'s status. Currently the only supported transition is closing a poll by sending `{ "status": "closed" }`.',
-      "",
-      "Close a poll once you have picked a date or the poll is no longer needed. Closing is non-destructive — the poll and its responses are preserved — but the results become final and participants can no longer vote. Consumers polling `GET /polls/:pollId/results` should remove closed polls from their queues.",
-      "",
-      "Closing is idempotent: closing an already-closed poll returns a `200` with the poll unchanged. The other statuses (`open`, `scheduled`, `canceled`) are not available via the API and return `422`.",
-    ].join("\n"),
-    security: [{ bearerAuth: [] }],
-    responses: {
-      200: {
-        description: "Poll updated successfully",
-        content: {
-          "application/json": {
-            schema: resolver(pollResponseSchema),
-          },
-        },
-      },
-      401: unauthorizedResponse,
-      403: spaceNotProResponse,
-      429: rateLimitExceededResponse,
-      503: serviceUnavailableResponse,
-      404: {
-        description: "Poll not found",
-        content: {
-          "application/json": {
-            schema: resolver(errorResponseSchema),
-          },
-        },
-      },
-      422: {
-        description: "The requested status transition is not available",
-        content: {
-          "application/json": {
-            schema: resolver(errorResponseSchema),
-          },
-        },
-      },
-    },
-  }),
-  validator("json", patchPollInputSchema, validationHook),
-  async (c) => {
-    const { pollId } = c.req.param();
-    const { status } = c.req.valid("json");
-    const { spaceId } = c.get("apiAuth");
-
-    if (status !== "closed") {
-      return c.json(
-        apiError(
-          "TRANSITION_NOT_AVAILABLE",
-          `Transitioning a poll to "${status}" is not available via the API. Only "closed" is supported.`,
-        ),
-        422,
-      );
-    }
-
-    const poll = await closePoll({ pollId, spaceId });
-
-    if (!poll) {
-      return c.json(
-        apiError(
-          "POLL_NOT_FOUND",
-          "Poll not found or does not belong to this space.",
-        ),
-        404,
-      );
-    }
-
-    return c.json(pollResponseSchema.parse(toPollResponseBody(poll)));
-  },
-);
-
 app.get(
   "/polls/:pollId/results",
   spaceApiKeyAuth,
@@ -875,7 +773,7 @@ app.get(
     tags: ["Polls"],
     summary: "Get poll results",
     description: [
-      "Retrieves aggregated voting results for a poll: vote counts per option without individual participant data. Use `GET /polls/:pollId/participants` for per-person availability.",
+      "Retrieves aggregated voting results for a poll: vote counts per option without individual participant data. Use `GET /polls/:pollId/participants` to list who responded.",
       "",
       "`votes` lists every vote type the poll offers with its count, zero included. `score` is an opaque ranking value: sort by it to order options from best to worst, and use `isTopChoice` or `highScore` to find the leading options. Its formula is not part of the contract, so do not decode it, compare it across polls or threshold on it.",
     ].join("\n"),
@@ -947,9 +845,9 @@ app.get(
     tags: ["Polls"],
     summary: "List poll participants",
     description: [
-      "Lists the participants of a poll with their votes, oldest response first. The poll must belong to the space associated with the API key.",
+      "Lists every participant of a poll in one response, oldest response first. The poll must belong to the space associated with the API key.",
       "",
-      "Each participant's `votes` pairs an `optionId` from the poll with the answer they gave, so this is the endpoint for per-person availability. Results are paginated with a cursor: pass the `nextCursor` value from the previous response to fetch the next page.",
+      "Per-option answers are not included; use the results endpoint for aggregate availability.",
     ].join("\n"),
     security: [{ bearerAuth: [] }],
     responses: {
@@ -958,14 +856,6 @@ app.get(
         content: {
           "application/json": {
             schema: resolver(getPollParticipantsSuccessResponseSchema),
-          },
-        },
-      },
-      400: {
-        description: "Invalid query parameters",
-        content: {
-          "application/json": {
-            schema: resolver(errorResponseSchema),
           },
         },
       },
@@ -983,13 +873,11 @@ app.get(
       },
     },
   }),
-  validator("query", listParticipantsQuerySchema, validationHook),
   async (c) => {
     const { pollId } = c.req.param();
-    const { cursor, limit } = c.req.valid("query");
     const { spaceId } = c.get("apiAuth");
 
-    const data = await getPollParticipants({ pollId, spaceId, cursor, limit });
+    const data = await getPollParticipants({ pollId, spaceId });
 
     if (!data) {
       return c.json(
@@ -1008,9 +896,7 @@ app.get(
           name: participant.name,
           email: participant.email,
           createdAt: participant.createdAt.toISOString(),
-          votes: participant.votes,
         })),
-        nextCursor: data.nextCursor,
       }),
     );
   },

@@ -135,19 +135,14 @@ export async function getPollResults({
 }
 
 /**
- * Participants in response order (oldest first) with their recorded votes.
- * Pass `limit` to page with a cursor; omit it to return every participant.
+ * Every participant in response order (oldest first).
  */
 export async function getPollParticipants({
   pollId,
   spaceId,
-  cursor,
-  limit,
 }: {
   pollId: string;
   spaceId: AuthorizedSpaceId;
-  cursor?: string;
-  limit?: number;
 }) {
   const poll = await prisma.poll.findFirst({
     where: {
@@ -163,16 +158,8 @@ export async function getPollParticipants({
           name: true,
           email: true,
           createdAt: true,
-          votes: {
-            select: {
-              optionId: true,
-              type: true,
-            },
-          },
         },
         orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-        ...(limit !== undefined && { take: limit + 1 }),
-        ...(cursor && { cursor: { id: cursor }, skip: 1 }),
       },
     },
   });
@@ -181,13 +168,9 @@ export async function getPollParticipants({
     return null;
   }
 
-  const hasMore = limit !== undefined && poll.participants.length > limit;
-  const page = hasMore ? poll.participants.slice(0, limit) : poll.participants;
-
   return {
     pollId: poll.id,
-    participants: page,
-    nextCursor: hasMore ? (page[page.length - 1]?.id ?? null) : null,
+    participants: poll.participants,
   };
 }
 
