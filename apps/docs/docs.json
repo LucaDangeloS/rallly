@@ -83,7 +83,8 @@
               "api-reference/authentication",
               "api-reference/rate-limits",
               "api-reference/errors",
-              "api-reference/changelog"
+              "api-reference/changelog",
+              "api-reference/migrating-from-the-private-api"
             ]
           },
           {
@@ -139,8 +140,8 @@
     ],
     "primary": {
       "type": "button",
-      "label": "Dashboard",
-      "href": "https://github.com/lukevella/rallly"
+      "label": "Go to app",
+      "href": "https://app.rallly.co"
     }
   },
   "footer": {
