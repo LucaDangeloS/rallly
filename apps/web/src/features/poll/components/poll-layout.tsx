@@ -8,7 +8,7 @@ import {
   BreadcrumbSeparator,
 } from "@rallly/ui/breadcrumb";
 import { BarChart2Icon } from "lucide-react";
-import { useParams, usePathname } from "next/navigation";
+import { usePathname } from "next/navigation";
 import type React from "react";
 import { Link } from "@/components/link";
 import { usePoll } from "@/features/poll/client";
@@ -33,7 +33,7 @@ const Layout = ({ children }: React.PropsWithChildren) => {
   const pollLink = `/poll/${poll.id}`;
   const pathname = usePathname();
   return (
-    <div className="page-bg-gray-100 h-dvh overflow-auto dark:bg-gray-900">
+    <div className="page-bg-gray-100 relative h-dvh overflow-auto dark:bg-gray-900">
       <div className="sticky top-0 z-40 border-b bg-gray-100/90 p-3 backdrop-blur-lg sm:flex-row dark:bg-gray-900/90">
         <div className="flex justify-between">
           <div className="flex min-w-0 items-center gap-x-2.5">
@@ -79,15 +79,6 @@ const Layout = ({ children }: React.PropsWithChildren) => {
 };
 
 export const PollLayout = ({ children }: React.PropsWithChildren) => {
-  const params = useParams();
-
-  const urlId = params?.urlId as string;
-
-  if (!urlId) {
-    // probably navigating away
-    return null;
-  }
-
   return (
     <LegacyPollContextProvider>
       <Layout>{children}</Layout>
