@@ -3,7 +3,32 @@ import { Card } from "@rallly/ui/card";
 import type * as React from "react";
 
 export function PlanCard({ className, ...props }: React.ComponentProps<"div">) {
-  return <Card className={cn("@container", className)} {...props} />;
+  return (
+    <Card className={cn("@container flex flex-col", className)} {...props} />
+  );
+}
+
+export function PlanCardHeading({
+  className,
+  ...props
+}: React.ComponentProps<"div">) {
+  return <div className={cn("space-y-0.5 px-4 pt-4", className)} {...props} />;
+}
+
+export function PlanCardHeadingTitle({
+  className,
+  ...props
+}: React.ComponentProps<"h2">) {
+  return <h2 className={cn("font-semibold text-sm", className)} {...props} />;
+}
+
+export function PlanCardHeadingDescription({
+  className,
+  ...props
+}: React.ComponentProps<"p">) {
+  return (
+    <p className={cn("text-muted-foreground text-sm", className)} {...props} />
+  );
 }
 
 export function PlanCardHeader({
@@ -13,7 +38,53 @@ export function PlanCardHeader({
   return (
     <div
       className={cn(
-        "flex @sm:flex-row flex-col items-start gap-3 p-3",
+        "flex @sm:flex-row flex-col @sm:items-center gap-4 p-4",
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
+export function PlanCardContent({
+  className,
+  ...props
+}: React.ComponentProps<"div">) {
+  return <div className={cn("min-w-0 space-y-1", className)} {...props} />;
+}
+
+export function PlanCardTitle({
+  className,
+  ...props
+}: React.ComponentProps<"div">) {
+  return (
+    <div
+      className={cn(
+        "flex flex-wrap items-center gap-x-2 gap-y-1 font-semibold text-xl",
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
+export function PlanCardDescription({
+  className,
+  ...props
+}: React.ComponentProps<"p">) {
+  return (
+    <p className={cn("text-muted-foreground text-sm", className)} {...props} />
+  );
+}
+
+export function PlanCardActions({
+  className,
+  ...props
+}: React.ComponentProps<"div">) {
+  return (
+    <div
+      className={cn(
+        "@sm:ml-auto flex shrink-0 flex-wrap items-center gap-2",
         className,
       )}
       {...props}
@@ -27,82 +98,14 @@ export function PlanCardFooter({
 }: React.ComponentProps<"div">) {
   return (
     <div
-      className={cn("border-card-border border-t p-3", className)}
-      {...props}
-    />
-  );
-}
-
-export function PlanCardIcon({
-  className,
-  ...props
-}: React.ComponentProps<"div">) {
-  return <div className={cn("shrink-0", className)} {...props} />;
-}
-
-export function PlanCardContent({
-  className,
-  ...props
-}: React.ComponentProps<"div">) {
-  return <div className={cn("min-w-0 flex-1", className)} {...props} />;
-}
-
-export function PlanCardTitle({
-  className,
-  ...props
-}: React.ComponentProps<"div">) {
-  return (
-    <div
       className={cn(
-        "flex items-center gap-x-2 font-semibold text-sm",
+        // Inset rule rather than a full width border, so the footer reads as
+        // part of the card rather than a separate band. mt-auto pins it to the
+        // bottom when paired cards have unequal content heights.
+        "mx-4 mt-auto flex @sm:flex-row flex-col @sm:items-center gap-2 border-card-border border-t pt-3 pb-4 text-muted-foreground text-sm @sm:[&>*:last-child]:ml-auto",
         className,
       )}
       {...props}
     />
-  );
-}
-
-export function PlanCardDescription({
-  className,
-  ...props
-}: React.ComponentProps<"p">) {
-  return (
-    <p
-      className={cn("truncate text-muted-foreground text-sm", className)}
-      {...props}
-    />
-  );
-}
-
-export function PlanCardPrice({
-  className,
-  ...props
-}: React.ComponentProps<"div">) {
-  return (
-    <div
-      className={cn("@sm:mr-2 shrink-0 @sm:text-right", className)}
-      {...props}
-    />
-  );
-}
-
-export function PlanCardPriceValue({
-  className,
-  ...props
-}: React.ComponentProps<"div">) {
-  return (
-    <div
-      className={cn("font-semibold text-sm tabular-nums", className)}
-      {...props}
-    />
-  );
-}
-
-export function PlanCardPriceDescription({
-  className,
-  ...props
-}: React.ComponentProps<"p">) {
-  return (
-    <p className={cn("text-muted-foreground text-sm", className)} {...props} />
   );
 }
