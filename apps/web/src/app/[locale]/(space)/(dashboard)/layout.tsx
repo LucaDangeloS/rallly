@@ -12,14 +12,16 @@ import {
   SidebarSeparator,
 } from "@rallly/ui/sidebar";
 import { SettingsIcon } from "lucide-react";
+import { Suspense } from "react";
 import { HoverPrefetchLink } from "@/components/hover-prefetch-link";
 import { PastDueAlert } from "@/features/billing/components/past-due-alert";
+import { UpdateIndicator } from "@/features/instance-settings/components/update-indicator";
 import { LicenseLimitWarning } from "@/features/licensing/components/license-limit-warning";
 import { CommandMenu } from "@/features/navigation/components/command-menu";
 import { SpaceDropdown } from "@/features/space/components/space-dropdown";
 import { listSpacesForUser } from "@/features/space/data";
 import { NavUser } from "@/features/user/components/nav-user";
-import { requireUser } from "@/features/user/loaders";
+import { loadUser } from "@/features/user/loaders";
 import { Trans } from "@/i18n/client";
 import { IfFeatureEnabled } from "@/lib/feature-flags/client";
 import { ControlPanelMenuItem } from "./components/control-panel-menu-item";
@@ -33,7 +35,7 @@ export default async function Layout({
 }: {
   children: React.ReactNode;
 }) {
-  const user = await requireUser();
+  const user = await loadUser();
   const spaces = await listSpacesForUser(user.id);
 
   return (
@@ -61,7 +63,16 @@ export default async function Layout({
                 <IfFeatureEnabled feature="feedback">
                   <FeedbackMenuItem />
                 </IfFeatureEnabled>
-                <ControlPanelMenuItem />
+                <ControlPanelMenuItem>
+                  {/* Admin-only and behind its own boundary: the update
+                      check is a network call that must not hold the
+                      sidebar back */}
+                  {user.role === "admin" ? (
+                    <Suspense fallback={null}>
+                      <UpdateIndicator />
+                    </Suspense>
+                  ) : null}
+                </ControlPanelMenuItem>
                 <SidebarMenuItem>
                   <SidebarMenuButton
                     render={<HoverPrefetchLink href="/settings/profile" />}
