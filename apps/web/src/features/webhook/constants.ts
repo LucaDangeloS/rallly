@@ -1,13 +1,3 @@
-import { isSelfHosted } from "@/lib/constants";
-
-/**
- * Webhooks ride on the API capability (cloud only) but stay behind their own
- * switch until the docs page that defines the payload contract is published.
- * Off by default, so production is dark until the switch is flipped.
- */
-export const isWebhooksEnabled =
-  !isSelfHosted && process.env.WEBHOOKS_ENABLED === "true";
-
 /**
  * Retry schedule indexed by the number of attempts already made: after the
  * first failure wait 1 minute, after the second 5 minutes, and so on. A
@@ -27,7 +17,9 @@ export const MAX_DELIVERY_ATTEMPTS = RETRY_DELAYS_MS.length + 1;
  * Fan-out reads activities up to now minus this lag. cuid ids are not
  * monotonic, so the cursor is `createdAt`, which is the start of the
  * transaction that wrote the row, not its commit. The lag keeps the common
- * case from ever seeing an uncommitted row.
+ * case from ever seeing an uncommitted row. A run triggered by a write
+ * skips it: its own row has committed, and the overlap below catches any
+ * other that has not.
  */
 export const FAN_OUT_LAG_MS = 10_000;
 
