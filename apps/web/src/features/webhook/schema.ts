@@ -236,6 +236,26 @@ export const webhookEventSchema = z
 
 export type WebhookEvent = z.infer<typeof webhookEventSchema>;
 
+/**
+ * Sent only by "Send test event" in the settings page, to that one endpoint,
+ * whatever it subscribes to. Deliberately outside `webhookEventTypeSchema`:
+ * it is not something an endpoint subscribes to, so it never appears in the
+ * picker and a test never fails for want of a subscription.
+ */
+export const webhookPingEventSchema = z
+  .object({
+    ...envelope,
+    type: z.literal("ping"),
+    data: z.object({}),
+  })
+  .meta({
+    id: "WebhookPingEvent",
+    description:
+      "A test event sent from the webhooks settings page. It carries no data; respond with a 2xx and otherwise ignore it.",
+  });
+
+export type WebhookPingEvent = z.infer<typeof webhookPingEventSchema>;
+
 const rejectionMessages = {
   invalid: "Enter a valid URL",
   insecure_scheme: "Webhook URLs must use https",
@@ -266,9 +286,13 @@ export const webhookUrlSchema = z
 // to a run, and keeps the list readable.
 export const MAX_WEBHOOKS_PER_SPACE = 5;
 
+const webhookEventsSchema = z
+  .array(webhookEventTypeSchema)
+  .min(1, "Select at least one event");
+
 export const createWebhookInputSchema = z.object({
   url: webhookUrlSchema,
-  events: z.array(webhookEventTypeSchema).min(1),
+  events: webhookEventsSchema,
 });
 
 export type CreateWebhookInput = z.infer<typeof createWebhookInputSchema>;
@@ -276,7 +300,7 @@ export type CreateWebhookInput = z.infer<typeof createWebhookInputSchema>;
 export const updateWebhookInputSchema = z.object({
   webhookId: z.string(),
   url: webhookUrlSchema.optional(),
-  events: z.array(webhookEventTypeSchema).min(1).optional(),
+  events: webhookEventsSchema.optional(),
   enabled: z.boolean().optional(),
 });
 
@@ -288,5 +312,9 @@ export const setWebhookEnabledSchema = z.object({
 });
 
 export const deleteWebhookSchema = z.object({
+  webhookId: z.string(),
+});
+
+export const sendWebhookTestEventSchema = z.object({
   webhookId: z.string(),
 });
