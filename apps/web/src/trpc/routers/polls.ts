@@ -8,6 +8,7 @@ import { TRPCError } from "@trpc/server";
 import { after } from "next/server";
 import * as z from "zod";
 import { getInstanceBranding, getSpaceBranding } from "@/emails/branding";
+import { toEmailConferencing } from "@/emails/conferencing";
 import { recordPollActivities } from "@/features/activity/mutations";
 import {
   getConnectedConferencingProviders,
@@ -39,6 +40,7 @@ import {
   isSpaceBrandingActive,
 } from "@/features/space/utils";
 import { scheduleWebhookDispatch } from "@/features/webhook/mutations";
+import { resolveTimeZoneAtWallTime } from "@/lib/datetime/time-zone-overrides";
 import { dayjs } from "@/lib/dayjs";
 import { AppError } from "@/lib/errors/app-error";
 import { identifyGroup, track } from "@/lib/posthog";
@@ -107,10 +109,13 @@ async function mintConferencing({
   }
 
   const label = conferencingProviderLabels[conferencing.provider];
-  const code =
-    result.reason === "not_connected"
-      ? "CONFERENCING_NOT_CONNECTED"
-      : "CONFERENCING_FAILED";
+  const code = (
+    {
+      not_connected: "CONFERENCING_NOT_CONNECTED",
+      cannot_host: "CONFERENCING_CANNOT_HOST",
+      provider_error: "CONFERENCING_FAILED",
+    } as const
+  )[result.reason];
   throw new TRPCError({
     code: "PRECONDITION_FAILED",
     message: `${label} meeting could not be created (${code})`,
@@ -267,7 +272,9 @@ export const polls = router({
       const optionsData = input.options.map((option) => ({
         startTime:
           timeZone && option.endDate
-            ? dayjs(option.startDate).tz(timeZone, true).toDate()
+            ? dayjs(option.startDate)
+                .tz(resolveTimeZoneAtWallTime(timeZone, option.startDate), true)
+                .toDate()
             : dayjs(option.startDate).utc(true).toDate(),
         duration: option.endDate
           ? dayjs(option.endDate).diff(dayjs(option.startDate), "minute")
@@ -462,7 +469,12 @@ export const polls = router({
             if (end) {
               return {
                 startTime: input.timeZone
-                  ? dayjs(start).tz(input.timeZone, true).toDate()
+                  ? dayjs(start)
+                      .tz(
+                        resolveTimeZoneAtWallTime(input.timeZone, start),
+                        true,
+                      )
+                      .toDate()
                   : dayjs(start).utc(true).toDate(),
                 duration: dayjs(end).diff(dayjs(start), "minute"),
                 pollId,
@@ -1127,6 +1139,9 @@ export const polls = router({
       const conferencingUri = conferencing
         ? getConferencingUri(conferencing)
         : undefined;
+      const emailConferencing = conferencing
+        ? toEmailConferencing(conferencing)
+        : undefined;
       const event = createIcsEvent({
         uid,
         sequence: 0,
@@ -1295,7 +1310,7 @@ export const polls = router({
         const hostName = poll.user.name;
         const hostLocale = poll.user.locale ?? undefined;
 
-        const { date, day, dow, time } = formatEventDateTime({
+        const { date, time } = formatEventDateTime({
           start: scheduledEvent.start,
           end: scheduledEvent.end,
           allDay: scheduledEvent.allDay,
@@ -1318,7 +1333,8 @@ export const polls = router({
             props: {
               name: hostName,
               pollUrl: absoluteUrl(`/poll/${poll.id}`),
-              location: poll.location,
+              location: poll.location || undefined,
+              conferencing: emailConferencing,
               title: poll.title,
               attendees: poll.participants
                 .filter((p) =>
@@ -1328,15 +1344,13 @@ export const polls = router({
                 )
                 .map((p) => p.name),
               date,
-              day,
-              dow,
               time,
             },
           }),
         );
 
         for (const p of participantsToEmail) {
-          const { date, day, dow, time } = formatEventDateTime({
+          const { date, time } = formatEventDateTime({
             start: scheduledEvent.start,
             end: scheduledEvent.end,
             allDay: scheduledEvent.allDay,
@@ -1360,9 +1374,9 @@ export const polls = router({
                 pollUrl: shortUrl(`/invite/${poll.id}`),
                 title: poll.title,
                 hostName: poll.user?.name ?? "",
+                location: poll.location || undefined,
+                conferencing: emailConferencing,
                 date,
-                day,
-                dow,
                 time,
               },
             }),
