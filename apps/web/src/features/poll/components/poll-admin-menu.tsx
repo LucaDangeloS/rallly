@@ -10,29 +10,28 @@ import {
   DropdownMenuTrigger,
 } from "@rallly/ui/dropdown-menu";
 import {
-  CalendarCheck2Icon,
   CircleStopIcon,
   CopyIcon,
   DownloadIcon,
   MoreHorizontalIcon,
+  PencilIcon,
   PlayIcon,
   TrashIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { Link } from "@/components/link";
 import { showPayWall, useIsFree } from "@/features/billing/client";
 import { ProBadge } from "@/features/billing/components/pro-badge";
 import { usePoll } from "@/features/poll/client";
 import { DuplicateDialog } from "@/features/poll/components/duplicate-dialog";
 import { DeletePollDialog } from "@/features/poll/components/manage-poll/delete-poll-dialog";
-import { SchedulePollDialog } from "@/features/poll/components/manage-poll/schedule-poll-dialog";
 import { useCsvExporter } from "@/features/poll/components/manage-poll/use-csv-exporter";
 import { Trans, useTranslation } from "@/i18n/client";
 import { trpc } from "@/trpc/client";
 
 /**
  * The poll admin header's overflow menu. Reads the poll from the legacy
- * poll context because the schedule dialog and CSV export need every
- * response's votes.
+ * poll context because the CSV export needs every response's votes.
  */
 export function PollAdminMenu() {
   const poll = usePoll();
@@ -40,7 +39,6 @@ export function PollAdminMenu() {
   const router = useRouter();
   const isFree = useIsFree();
   const { exportToCsv } = useCsvExporter();
-  const scheduleDialog = useDialog();
   const duplicateDialog = useDialog();
   const deleteDialog = useDialog();
   // These pages are server rendered, so a status change shows once they are
@@ -51,8 +49,6 @@ export function PollAdminMenu() {
   const closePoll = trpc.polls.close.useMutation({
     onSuccess: () => router.refresh(),
   });
-
-  const canSchedule = poll.status === "open" || poll.status === "closed";
 
   return (
     <>
@@ -69,29 +65,21 @@ export function PollAdminMenu() {
           <MoreHorizontalIcon />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
+          {poll.status === "scheduled" ? null : (
+            <>
+              <DropdownMenuItem
+                render={<Link href={`/poll/${poll.id}/edit?from=admin`} />}
+              >
+                <PencilIcon />
+                <Trans i18nKey="edit" defaults="Edit" />
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+            </>
+          )}
           <DropdownMenuItem onClick={exportToCsv}>
             <DownloadIcon />
             <Trans i18nKey="exportToCsv" defaults="Export to CSV" />
           </DropdownMenuItem>
-          {canSchedule ? (
-            <DropdownMenuItem
-              onClick={() => {
-                if (isFree) {
-                  showPayWall({
-                    from: "manage-poll",
-                    action: "schedule",
-                    pollId: poll.id,
-                  });
-                } else {
-                  scheduleDialog.trigger();
-                }
-              }}
-            >
-              <CalendarCheck2Icon />
-              <Trans i18nKey="schedulePoll" defaults="Schedule" />
-              {isFree ? <ProBadge /> : null}
-            </DropdownMenuItem>
-          ) : null}
           <DropdownMenuItem
             onClick={() => {
               if (isFree) {
@@ -135,7 +123,6 @@ export function PollAdminMenu() {
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      <SchedulePollDialog {...scheduleDialog.dialogProps} />
       <DuplicateDialog
         pollId={poll.id}
         pollTitle={poll.title}
