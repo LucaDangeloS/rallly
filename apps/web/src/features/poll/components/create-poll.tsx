@@ -26,6 +26,12 @@ import { PollSettingsForm } from "@/features/poll/components/forms/poll-settings
 import type { NewEventData } from "@/features/poll/components/forms/types";
 import { SelectedOptionsCount } from "@/features/poll/components/selected-options-count";
 import { SHARE_POLL_FLASH_KEY } from "@/features/poll/constants";
+import {
+  hideOpenPollLimit,
+  showOpenPollLimit,
+} from "@/features/poll/limit/client";
+import type { OpenPollUsage } from "@/features/poll/limit/types";
+import { isAtOpenPollLimit } from "@/features/poll/limit/utils";
 import { useUser } from "@/features/user/client";
 import { UserDropdown } from "@/features/user/components/user-dropdown";
 import { Trans, useTranslation } from "@/i18n/client";
@@ -108,9 +114,11 @@ const CreatePollActions = ({
 export const CreatePoll = ({
   nav,
   conferencing,
+  openPollUsage,
 }: {
   nav?: React.ReactNode;
   conferencing?: ConferencingOptions | null;
+  openPollUsage?: OpenPollUsage | null;
 }) => {
   const { t } = useTranslation();
   const router = useRouter();
@@ -159,6 +167,31 @@ export const CreatePoll = ({
   });
 
   const makePoll = trpc.polls.make.useMutation();
+
+  // Explain the limit before the organizer fills in a form they can't submit.
+  // The form persists, so it survives closing a poll to make room. The count
+  // is the server's at page load, so the poll created here can't trip it.
+  React.useEffect(() => {
+    if (!openPollUsage) {
+      return;
+    }
+    if (isAtOpenPollLimit(openPollUsage)) {
+      showOpenPollLimit("create", openPollUsage);
+    } else {
+      hideOpenPollLimit("create");
+    }
+  }, [openPollUsage]);
+
+  // The client router reuses a page it rendered in the last minute
+  // (staleTimes.dynamic), so a /new loaded before the organizer opened or
+  // closed polls would show the old count. Render it fresh once on arrival.
+  const hasRefreshedUsage = React.useRef(false);
+  React.useEffect(() => {
+    if (openPollUsage && !hasRefreshedUsage.current) {
+      hasRefreshedUsage.current = true;
+      router.refresh();
+    }
+  }, [openPollUsage, router]);
 
   return (
     <Form {...form}>
@@ -230,7 +263,9 @@ export const CreatePoll = ({
               setCreatedPollId(res.data.id);
               setFlash(SHARE_POLL_FLASH_KEY, res.data.id);
               router.push(`/poll/${res.data.id}`);
-            } else if (res.error.code === "INAPPROPRIATE_CONTENT") {
+            } else if (res.error.code === "OPEN_POLL_LIMIT_REACHED") {
+              showOpenPollLimit("create", res.error.usage);
+            } else {
               toast.error(
                 t("inappropriateContent", {
                   defaultValue: "Inappropriate content",
