@@ -205,6 +205,7 @@ const leadingBenefitByTrigger: Partial<Record<PayWallTrigger["from"], string>> =
     "api-keys": "apiAccess",
     "poll-footer": "removeAttribution",
     "poll-limit": "unlimitedOpenPolls",
+    "poll-limit-meter": "unlimitedOpenPolls",
   };
 
 // The benefit that triggered the pay wall leads the list. Unlimited open
@@ -312,7 +313,7 @@ export function PayWallDialog({
     >
       <DialogContent
         size="4xl"
-        className="overflow-hidden p-0 lg:min-h-[500px]"
+        className="*:data-[slot=dialog-scroller]:p-0 lg:min-h-[min(500px,calc(100dvh-2rem))]"
       >
         <Tabs
           value={selectedPlan}
