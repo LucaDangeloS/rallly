@@ -24,6 +24,7 @@ import { Trans } from "react-i18next/TransWithoutContext";
 import GoogleMeetIcon from "@/assets/google-meet.svg";
 import MicrosoftTeamsIcon from "@/assets/microsoft-teams.svg";
 import WebexIcon from "@/assets/webex.svg";
+import ZoomIcon from "@/assets/zoom.svg";
 import {
   CompareTable,
   CompareTableCell,
@@ -848,6 +849,9 @@ export default async function Page(props: {
                     <CompareTableLogo label="Google Meet">
                       <GoogleMeetIcon aria-hidden="true" />
                     </CompareTableLogo>
+                    <CompareTableLogo label="Zoom">
+                      <ZoomIcon aria-hidden="true" />
+                    </CompareTableLogo>
                     <CompareTableLogo label="Microsoft Teams">
                       <MicrosoftTeamsIcon aria-hidden="true" />
                     </CompareTableLogo>
@@ -1205,7 +1209,10 @@ export async function generateMetadata(props: {
   const { t } = await getTranslation(locale, ["common", "pricing"]);
   return {
     alternates: getAlternates({ locale, path: "/pricing" }),
-    title: t("pricing", { ns: "common", defaultValue: "Pricing" }),
+    title: t("pricingMetaTitle", {
+      ns: "pricing",
+      defaultValue: "Pricing: Free and Pro Plans",
+    }),
     description: t("pricingDescription", {
       ns: "pricing",
     }),
