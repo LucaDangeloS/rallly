@@ -5,7 +5,7 @@
 
 import path from "node:path";
 import createBundleAnalyzer from "@next/bundle-analyzer";
-import { withSentryConfig } from "@sentry/nextjs";
+import { withSentryConfig } from "@sentry/nextjs/config";
 import type { NextConfig } from "next";
 
 const withBundleAnalyzer = createBundleAnalyzer({
@@ -184,14 +184,10 @@ const sentryWebpackPluginOptions = {
   // Upload a larger set of source maps for prettier stack traces (increases build time)
   widenClientFileUpload: true,
 
-  // Uncomment to route browser requests to Sentry through a Next.js rewrite to circumvent ad-blockers.
-  // This can increase your server load as well as your hosting bill.
-  // Note: Check that the configured route will not match with your Next.js middleware, otherwise reporting of client-
-  // side errors will fail.
-  // tunnelRoute: "/monitoring",
-
-  // Hides source maps from generated client bundles
-  hideSourceMaps: true,
+  // Routes browser events through a same-origin rewrite so ad blockers don't
+  // drop them. A fixed path rather than `true` because the proxy matcher in
+  // src/proxy.ts must exclude it, and `true` picks a new path every build.
+  tunnelRoute: "/z1tk88rw",
 };
 
 const withBundleAnalyzerConfig = withBundleAnalyzer(nextConfig);
