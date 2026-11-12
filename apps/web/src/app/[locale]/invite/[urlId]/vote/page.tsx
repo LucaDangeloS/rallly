@@ -98,6 +98,10 @@ async function PageContent({ params, searchParams }: PageProps) {
             label: t("voteFooterPrivacy", { defaultValue: "Privacy policy" }),
             href: "https://rallly.co/privacy-policy",
           },
+          {
+            label: t("voteFooterCookies", { defaultValue: "Cookie policy" }),
+            href: "https://rallly.co/cookie-policy",
+          },
         ];
 
   return (
@@ -138,38 +142,38 @@ async function PageContent({ params, searchParams }: PageProps) {
           )}
         </div>
       </header>
-      {/* From lg the sidebar and answers sit in a card that fits its content, up to
-          a maximum height, after which the sidebar and the answers each scroll on their own. Its width comes from main. */}
+      {/* From lg the sidebar and answers sit in a card of fixed height, inside which
+          the sidebar and the answers each scroll on their own. Its width comes from main.
+          The details step has only a short form, so there the card is as tall as
+          that needs, up to the same height. */}
       <div
         data-invite-card
-        className="flex flex-1 flex-col lg:mx-auto lg:my-auto lg:max-h-180 lg:min-h-[min(32rem,calc(100dvh-8rem))] lg:w-fit lg:max-w-[calc(100%-2rem)] lg:flex-none lg:shrink lg:overflow-hidden lg:rounded-2xl lg:border lg:bg-card lg:shadow-xs"
+        className="flex flex-1 flex-col lg:mx-auto lg:my-auto lg:h-[min(45rem,calc(100dvh-8rem))] lg:w-fit lg:max-w-[calc(100%-2rem)] lg:flex-none lg:shrink lg:overflow-hidden lg:rounded-2xl lg:border lg:bg-card lg:shadow-xs lg:has-[[data-invite-details]]:h-auto lg:has-[[data-invite-details]]:max-h-[min(45rem,calc(100dvh-8rem))]"
       >
-        <div data-invite-frame className="flex flex-1 flex-col lg:min-h-0">
-          <AccessibleBallot
-            poll={poll}
-            ballot={ballot}
-            showCreatePollPrompt={
-              !hideAttribution && isFeatureEnabled("createPollPrompt")
-            }
-            lockup={
-              space ? (
-                <EventLockup
-                  spaceName={space.name}
-                  spaceImage={space.image}
-                  title={poll.title}
-                />
-              ) : null
-            }
-            description={
-              poll.description ? (
-                <EventMetaDescription
-                  className="mt-2 text-base/7 text-muted-foreground lg:text-sm/6"
-                  content={poll.description}
-                />
-              ) : null
-            }
-          />
-        </div>
+        <AccessibleBallot
+          poll={poll}
+          ballot={ballot}
+          showCreatePollPrompt={
+            !hideAttribution && isFeatureEnabled("createPollPrompt")
+          }
+          lockup={
+            space ? (
+              <EventLockup
+                spaceName={space.name}
+                spaceImage={space.image}
+                title={poll.title}
+              />
+            ) : null
+          }
+          description={
+            poll.description ? (
+              <EventMetaDescription
+                className="mt-2 text-base/7 text-muted-foreground lg:text-sm/6"
+                content={poll.description}
+              />
+            ) : null
+          }
+        />
       </div>
       {/* Last in the reading order, and outside the card from lg. Its top padding
           keeps the links clear of the buttons above on a phone. */}
