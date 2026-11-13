@@ -1,11 +1,25 @@
-import { INCLUDED_API_POLLS } from "@rallly/billing/pricing";
+import {
+  apiPollTierLimits,
+  INCLUDED_API_POLLS,
+  parseApiPollTier,
+} from "@rallly/billing/pricing";
+import { API_POLL_NEAR_LIMIT_RATIO } from "./constants";
 
 export function startOfUtcMonth(now: Date) {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
 }
 
+export function toMonthKey(date: Date) {
+  return date.toISOString().slice(0, 7);
+}
+
 export function startOfNextUtcMonth(now: Date) {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+}
+
+export function apiPollTierLimit(value: string | null) {
+  const tier = parseApiPollTier(value);
+  return tier ? apiPollTierLimits[tier] : null;
 }
 
 export function resolveApiPollLimit({
@@ -35,6 +49,6 @@ export function getQuotaWarningLevel({
   limit: number;
 }) {
   if (count >= limit) return "at_limit" as const;
-  if (count >= limit * 0.8) return "near_limit" as const;
+  if (count >= limit * API_POLL_NEAR_LIMIT_RATIO) return "near_limit" as const;
   return null;
 }
