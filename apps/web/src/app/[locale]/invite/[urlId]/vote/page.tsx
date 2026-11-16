@@ -1,8 +1,10 @@
-import { cn } from "@rallly/ui";
+import { buttonVariants, cn } from "@rallly/ui";
+import { ArrowUpRightIcon } from "lucide-react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { InstanceFooterLinks } from "@/components/instance-footer-links";
+import { Link } from "@/components/link";
 import { Spinner } from "@/components/spinner";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Logo } from "@/features/branding/components/logo";
@@ -17,9 +19,11 @@ import { PollUnavailable } from "@/features/poll/invite/components/poll-unavaila
 import { loadInviteBallot } from "@/features/poll/invite/loaders";
 import { loadPollAvailability, loadPollDetails } from "@/features/poll/loaders";
 import { PoweredByLink } from "@/features/poll/vote/components/powered-by-link";
+import { loadCanManagePoll } from "@/features/poll/vote/loaders";
 import { getTranslation } from "@/i18n/server";
 import { isFeatureEnabled } from "@/lib/feature-flags/server";
 import { AccessibleBallot } from "./components/accessible-ballot";
+import { CollapsibleDescription } from "./components/collapsible-description";
 import { EventLockup } from "./components/event-lockup";
 import { InviteHelp } from "./components/help/invite-help";
 import { InviteHelpSheet } from "./components/help/invite-help-sheet";
@@ -65,12 +69,14 @@ async function PageContent({ params, searchParams }: PageProps) {
 
   const token = getInviteToken({ token: tokenParam, invite: inviteParam });
   const { t } = await getTranslation();
-  const [poll, ballot, instanceBranding, footerLinks] = await Promise.all([
-    loadPollDetails(urlId),
-    loadInviteBallot({ pollId: urlId, token }),
-    loadInstanceBranding(),
-    loadFooterLinks(),
-  ]);
+  const [poll, ballot, instanceBranding, footerLinks, canManage] =
+    await Promise.all([
+      loadPollDetails(urlId),
+      loadInviteBallot({ pollId: urlId, token }),
+      loadInstanceBranding(),
+      loadFooterLinks(),
+      loadCanManagePoll(urlId),
+    ]);
 
   if (!poll || !ballot) {
     notFound();
@@ -121,6 +127,15 @@ async function PageContent({ params, searchParams }: PageProps) {
             </div>
           ) : null}
           <div className="ml-auto flex h-12 shrink-0 items-center gap-1">
+            {canManage ? (
+              <Link
+                className={cn(buttonVariants({ size: "sm" }), "mr-1")}
+                href={`/poll/${poll.id}`}
+              >
+                {t("managePoll", { defaultValue: "Manage poll" })}
+                <ArrowUpRightIcon data-icon="inline-end" />
+              </Link>
+            ) : null}
             <InviteHelpSheet>
               <Suspense
                 fallback={
@@ -142,13 +157,11 @@ async function PageContent({ params, searchParams }: PageProps) {
           )}
         </div>
       </header>
-      {/* From lg the sidebar and answers sit in a card. It is as tall as what it
-          holds, between a floor that keeps a short poll from looking stranded and
-          a ceiling past which the sidebar and the answers each scroll on their
-          own. Its width comes from main. */}
+      {/* From lg the sidebar and answers sit in a card. Main sets its size: 4:3
+          where the screen has room, and never taller than the screen. */}
       <div
         data-invite-card
-        className="flex flex-1 flex-col lg:mx-auto lg:my-auto lg:max-h-[min(45rem,calc(100dvh-8rem))] lg:min-h-88 lg:w-fit lg:max-w-[calc(100%-2rem)] lg:flex-none lg:shrink lg:overflow-hidden lg:rounded-2xl lg:border lg:bg-card lg:shadow-xs"
+        className="flex flex-1 flex-col lg:mx-auto lg:my-auto lg:max-h-[calc(100dvh-8rem)] lg:w-fit lg:max-w-[calc(100%-2rem)] lg:flex-none lg:shrink lg:overflow-hidden lg:rounded-2xl lg:border lg:bg-card lg:shadow-xs"
       >
         <AccessibleBallot
           poll={poll}
@@ -167,10 +180,12 @@ async function PageContent({ params, searchParams }: PageProps) {
           }
           description={
             poll.description ? (
-              <EventMetaDescription
-                className="mt-2 text-base/7 text-muted-foreground lg:text-sm/6"
-                content={poll.description}
-              />
+              <CollapsibleDescription>
+                <EventMetaDescription
+                  className="mt-2 text-base/7 text-muted-foreground lg:text-sm/6"
+                  content={poll.description}
+                />
+              </CollapsibleDescription>
             ) : null
           }
         />

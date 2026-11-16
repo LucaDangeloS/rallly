@@ -64,6 +64,7 @@ import {
   usePastOptions,
 } from "@/features/poll/invite/client";
 import { BallotBarOption } from "@/features/poll/invite/components/ballot-bar-option";
+import { BallotBreakdown } from "@/features/poll/invite/components/ballot-breakdown";
 import { BallotCount } from "@/features/poll/invite/components/ballot-count";
 import {
   ballotBarButtonClassName,
@@ -71,6 +72,7 @@ import {
 } from "@/features/poll/invite/components/ballot-pill";
 import { BallotResponseOptions } from "@/features/poll/invite/components/ballot-response-options";
 import { BallotTimeControls } from "@/features/poll/invite/components/ballot-time-controls";
+import type { BallotTimeValue } from "@/features/poll/invite/components/ballot-time-text";
 import { BallotTimeText } from "@/features/poll/invite/components/ballot-time-text";
 import { BallotVoteMark } from "@/features/poll/invite/components/ballot-vote-mark";
 import { PastTimesToggle } from "@/features/poll/invite/components/past-times-toggle";
@@ -79,6 +81,7 @@ import {
   availableCount,
   groupBallotOptions,
   nextVote,
+  optionBreakdown,
 } from "@/features/poll/invite/utils";
 import {
   addParticipantAction,
@@ -96,6 +99,7 @@ import {
 import { Trans, useTranslation } from "@/i18n/client";
 import { useDateTimeConfig } from "@/lib/datetime/client";
 import {
+  formatDateParts,
   formatDateTime,
   formatDateTimeRange,
   formatDuration,
@@ -764,8 +768,16 @@ export function AccessibleBallot({
   };
 
   /** What a row shows on screen; the day heading above it carries the date. */
-  const rowTimeLabel = (option: Ballot["options"][number]) => {
-    if (ballot.isDatePoll || option.duration === 0) {
+  const rowTimeLabel = (option: Ballot["options"][number]): BallotTimeValue => {
+    if (ballot.isDatePoll) {
+      // The month heading carries the month; the row needs only the day.
+      const { day, weekday } = formatDateParts(new Date(option.startTime), {
+        locale,
+        timeZone: displayTimeZone,
+      });
+      return { day, weekday };
+    }
+    if (option.duration === 0) {
       return date(option.startTime, "weekdayMonthDay");
     }
     const start = new Date(option.startTime);
@@ -800,6 +812,28 @@ export function AccessibleBallot({
 
   const total =
     ballot.responseCount + (state.canChange && !state.activeResponseId ? 1 : 0);
+
+  // Who answered what, for options whose count opens it. Not when the poll
+  // withholds other people's names: there would be no one to list.
+  const renderBreakdown =
+    ballot.tallies && !ballot.hideParticipants
+      ? (optionId: string) => {
+          const option = optionsById.get(optionId);
+          return option && ballot.tallies ? (
+            <BallotBreakdown
+              option={option}
+              timeZone={ballot.isDatePoll ? null : ballot.timeZone}
+              total={total}
+              entries={optionBreakdown({
+                entries: ballot.tallies[optionId] ?? [],
+                activeResponseId: state.activeResponseId,
+                liveVote: state.answers[optionId],
+                viewerName: t("you", { defaultValue: "You" }),
+              })}
+            />
+          ) : null;
+        }
+      : null;
 
   // Outside the voting form: React events cross portals, so the form in here
   // would submit that one too.
@@ -1076,11 +1110,18 @@ export function AccessibleBallot({
       className={cn(
         "flex w-full flex-1 flex-col gap-y-8 px-4 pt-4 lg:grid lg:min-h-0 lg:grid-rows-[minmax(0,1fr)] lg:items-stretch lg:px-0 lg:pt-0",
         // The card takes this width: the full one for the answers, and only what
-        // the form or the thanks need after that.
+        // the form or the thanks need after that. Its height is three quarters
+        // of that width, short of the screen's, and fixed so nothing inside
+        // resizes it: the sidebar and the answers each scroll on their own. The
+        // 2px is the card's border.
+        "lg:flex-none",
         compactCard
-          ? "lg:w-auto lg:grid-cols-[20rem_28rem] xl:grid-cols-[24rem_28rem]"
-          : "lg:w-[calc(100vw-2rem)] lg:max-w-5xl lg:grid-cols-[20rem_minmax(0,1fr)] xl:grid-cols-[24rem_minmax(0,1fr)]",
+          ? "lg:h-[min(36rem,calc(100dvh-8rem-2px))] lg:w-auto lg:grid-cols-[20rem_28rem] xl:h-[min(39rem,calc(100dvh-8rem-2px))] xl:grid-cols-[24rem_28rem]"
+          : "lg:h-[min(calc(100dvh-8rem-2px),calc(min(100vw-2rem,64rem)*0.75))] lg:w-[calc(100vw-2rem)] lg:max-w-5xl lg:grid-cols-[20rem_minmax(0,1fr)] xl:grid-cols-[24rem_minmax(0,1fr)]",
         compactOnPhone ? "max-lg:gap-y-4" : "max-lg:gap-y-6",
+        // Below lg the title sits in the header, so the description that
+        // follows it keeps the same gap it has under the title from lg.
+        !lockup && !compactOnPhone && "max-lg:pt-0",
       )}
     >
       <div
@@ -1512,6 +1553,7 @@ export function AccessibleBallot({
                                 : undefined
                             }
                             total={total}
+                            breakdown={renderBreakdown?.(optionId)}
                           />
                         );
                       })}
@@ -1681,7 +1723,9 @@ export function AccessibleBallot({
                               if (
                                 isPast ||
                                 pending ||
-                                (event.target as Element).closest("label")
+                                (event.target as Element).closest(
+                                  "label, button",
+                                )
                               )
                                 return;
                               answerOne(
@@ -1741,10 +1785,13 @@ export function AccessibleBallot({
                             </span>
                             {liveCount !== null ? (
                               <span
-                                aria-hidden="true"
+                                aria-hidden={renderBreakdown ? undefined : true}
                                 className="[&_[data-testid=ballot-tally]]:text-foreground"
                               >
-                                <BallotCount value={liveCount} />
+                                <BallotCount
+                                  value={liveCount}
+                                  breakdown={renderBreakdown?.(optionId)}
+                                />
                               </span>
                             ) : null}
                             {count ? (
