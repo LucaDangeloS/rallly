@@ -2,6 +2,7 @@
 
 import { posthog } from "@rallly/posthog/client";
 import { buttonVariants, cn } from "@rallly/ui";
+import { Alert, AlertDescription } from "@rallly/ui/alert";
 import { Button } from "@rallly/ui/button";
 import {
   Dialog,
@@ -48,13 +49,14 @@ import {
   UserRoundPenIcon,
 } from "lucide-react";
 import * as React from "react";
+import { flushSync } from "react-dom";
 import { Link } from "@/components/link";
 import { OptimizedAvatarImage } from "@/components/optimized-avatar-image";
 import { Spinner } from "@/components/spinner";
 import { getCityFromTimezoneId } from "@/components/time-zone-picker/timezone-data";
+import { AddToCalendarButton } from "@/features/calendars/components/add-to-calendar-button";
 import { PollConferencingSummary } from "@/features/conferencing/components/poll-conferencing-summary";
 import TruncatedLinkify from "@/features/poll/components/truncated-linkify";
-import VoteIcon from "@/features/poll/components/vote-icon";
 import {
   ensureSession,
   runBallotAction,
@@ -62,10 +64,10 @@ import {
   useBallotState,
   useLinkToken,
   usePastOptions,
+  useTimesChangedAt,
 } from "@/features/poll/invite/client";
 import { BallotBarOption } from "@/features/poll/invite/components/ballot-bar-option";
-import { BallotBreakdown } from "@/features/poll/invite/components/ballot-breakdown";
-import { BallotCount } from "@/features/poll/invite/components/ballot-count";
+import { BallotOptionBreakdown } from "@/features/poll/invite/components/ballot-breakdown";
 import {
   ballotBarButtonClassName,
   ballotToggleClassName,
@@ -74,14 +76,11 @@ import { BallotResponseOptions } from "@/features/poll/invite/components/ballot-
 import { BallotTimeControls } from "@/features/poll/invite/components/ballot-time-controls";
 import type { BallotTimeValue } from "@/features/poll/invite/components/ballot-time-text";
 import { BallotTimeText } from "@/features/poll/invite/components/ballot-time-text";
-import { BallotVoteMark } from "@/features/poll/invite/components/ballot-vote-mark";
 import { PastTimesToggle } from "@/features/poll/invite/components/past-times-toggle";
 import type { Ballot, BallotVote } from "@/features/poll/invite/types";
 import {
   availableCount,
   groupBallotOptions,
-  nextVote,
-  optionBreakdown,
 } from "@/features/poll/invite/utils";
 import {
   addParticipantAction,
@@ -105,17 +104,10 @@ import {
   formatDuration,
 } from "@/lib/datetime/format";
 import { getBrowserTimeZone } from "@/lib/utils/date-time-utils";
+import type { BallotVoteSource } from "./ballot-vote-row";
+import { BallotVoteRow } from "./ballot-vote-row";
 import { TimeZonePicker } from "./time-zone-picker";
 import { VoteSummary } from "./vote-summary";
-
-/** The hover for the rows a mouse can cycle. */
-const rowHoverClassName: Record<BallotVote | "none", string> = {
-  none: "[@media(pointer:fine)]:hover:border-gray-400 dark:[@media(pointer:fine)]:hover:border-gray-500",
-  no: "[@media(pointer:fine)]:hover:border-gray-400 dark:[@media(pointer:fine)]:hover:border-gray-500",
-  yes: "[@media(pointer:fine)]:hover:border-green-600 dark:[@media(pointer:fine)]:hover:border-green-400",
-  ifNeedBe:
-    "[@media(pointer:fine)]:hover:border-amber-600 dark:[@media(pointer:fine)]:hover:border-amber-400",
-};
 
 /** Inset as far from the right as from the top, so the button sits square in the field. */
 const fieldAddonClassName = "pr-1.5 has-[>button]:mr-0";
@@ -139,12 +131,6 @@ const shortcutOnClassName =
 const factIconClassName =
   "mt-[calc((1lh-1rem)/2)] size-4 shrink-0 text-muted-foreground";
 
-/** Kept in the tree and at a real position, so direct activation still lands. */
-const radiosUntilKeyboardClassName =
-  "group-not-has-[input:focus-visible]:absolute group-not-has-[input:focus-visible]:right-0 group-not-has-[input:focus-visible]:bottom-0 group-not-has-[input:focus-visible]:gap-0 group-not-has-[input:focus-visible]:opacity-0";
-const radioUntilKeyboardClassName =
-  "group-not-has-[input:focus-visible]:size-px group-not-has-[input:focus-visible]:overflow-hidden";
-
 type FieldError = { field: "name" | "email" | "votes"; message: string };
 
 /**
@@ -159,6 +145,8 @@ export function AccessibleBallot({
   description,
   lockup,
   showCreatePollPrompt,
+  defaultName,
+  defaultEmail,
 }: {
   poll: PollDetails;
   ballot: Ballot;
@@ -166,6 +154,9 @@ export function AccessibleBallot({
   lockup: React.ReactNode;
   /** An invitation to make a poll, where the page still credits Rallly. */
   showCreatePollPrompt: boolean;
+  /** A signed-in viewer's own details, which a new response starts with. */
+  defaultName?: string;
+  defaultEmail?: string;
   description: React.ReactNode;
 }) {
   const { t } = useTranslation();
@@ -177,18 +168,13 @@ export function AccessibleBallot({
 
   const [errors, setErrors] = React.useState<FieldError[]>([]);
   const [saveError, setSaveError] = React.useState<string | null>(null);
-  const [pending, setPending] = React.useState(false);
+  const [pending, setPendingState] = React.useState(false);
+  const pendingRef = React.useRef(false);
+  const setPending = (value: boolean) => {
+    pendingRef.current = value;
+    setPendingState(value);
+  };
   const [showNote, setShowNote] = React.useState(false);
-  const noteRemoved = React.useRef(false);
-
-  // The button that was pressed is gone, so focus goes back to the one that
-  // replaced it.
-  React.useEffect(() => {
-    if (!showNote && noteRemoved.current) {
-      noteRemoved.current = false;
-      document.getElementById("add-note")?.focus();
-    }
-  }, [showNote]);
   const [status, setStatus] = React.useState("");
   const deleteDialog = useDialog();
   const detailsDialog = useDialog();
@@ -325,6 +311,7 @@ export function AccessibleBallot({
 
   const backToAvailability = () => {
     if (stepExit) return;
+    capture("poll_vote:details_back_click");
     setErrors([]);
     setSaveError(null);
     setStepExit("back");
@@ -336,22 +323,7 @@ export function AccessibleBallot({
       ? "UTC"
       : (viewerTimeZone ?? getBrowserTimeZone());
 
-  // True just long enough for the values that moved to start animating, so a row
-  // that mounts later (Edit, showing past times) doesn't flash as if it had changed.
-  const displayKey = `${displayTimeZone}|${timeFormat}`;
-  const [previousDisplayKey, setPreviousDisplayKey] =
-    React.useState(displayKey);
-  const [timesChanged, setTimesChanged] = React.useState(false);
-  if (previousDisplayKey !== displayKey) {
-    setPreviousDisplayKey(displayKey);
-    setTimesChanged(true);
-  }
-  // biome-ignore lint/correctness/useExhaustiveDependencies: a second change in the window restarts it
-  React.useEffect(() => {
-    if (!timesChanged) return;
-    const timeout = setTimeout(() => setTimesChanged(false), 300);
-    return () => clearTimeout(timeout);
-  }, [timesChanged, displayKey]);
+  const timesChangedAt = useTimesChangedAt(`${displayTimeZone}|${timeFormat}`);
 
   const date = (iso: string, preset: "dateFull" | "weekdayMonthDay") =>
     formatDateTime(new Date(iso), {
@@ -405,10 +377,6 @@ export function AccessibleBallot({
     ifNeedBe: t("ifNeedBe", { defaultValue: "If need be" }),
     no: t("no", { defaultValue: "No" }),
   };
-  const answerChoices: BallotVote[] = ballot.allowTentativeVotes
-    ? ["yes", "ifNeedBe", "no"]
-    : ["yes", "no"];
-
   const votable = ballot.options.filter((option) => !past.ids.has(option.id));
   const answeredCount = votable.filter(
     (option) => state.answers[option.id],
@@ -418,6 +386,44 @@ export function AccessibleBallot({
   );
   const isNew = state.mode === "new";
   const hasChanges = state.hasChanges;
+
+  // Plain properties, not groups: a guest's events are personless, and PostHog
+  // drops group associations without person processing.
+  const capture = (event: string, properties?: Record<string, unknown>) => {
+    posthog?.capture(event, {
+      poll_id: ballot.pollId,
+      tier: poll.space?.tier,
+      option_count: ballot.options.length,
+      is_date_poll: ballot.isDatePoll,
+      has_response: Boolean(active),
+      ...properties,
+    });
+  };
+  const usedMarkAll = React.useRef(false);
+  const trackedPast = {
+    ...past,
+    toggle: () => {
+      capture("poll_vote:past_times_toggle", { show: !past.show });
+      past.toggle();
+    },
+  };
+  // Through a ref, so the memoized rows get a callback that never changes.
+  const captureRef = React.useRef(capture);
+  React.useLayoutEffect(() => {
+    captureRef.current = capture;
+  });
+  const captureBreakdownOpen = React.useCallback(
+    () => captureRef.current("poll_vote:breakdown_open"),
+    [],
+  );
+  const hadChanges = React.useRef(hasChanges);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once, as a saved response starts to change
+  React.useEffect(() => {
+    if (hasChanges && !hadChanges.current) {
+      capture("poll_vote:response_edit_start");
+    }
+    hadChanges.current = hasChanges;
+  }, [hasChanges]);
   // Not while there are changes to save: it would say saved over unsaved answers.
   const notice = active && ballot.canRespond && !hasChanges ? justSaved : null;
   // A first response is thanked in place of the form, until the viewer goes
@@ -541,10 +547,27 @@ export function AccessibleBallot({
 
   // An answer given by hand keeps what the shortcut did, so Undo can no longer
   // take it back over the top of that edit.
-  const answerOne = (optionId: string, vote: BallotVote) => {
-    setAnswersBeforeShortcut(null);
-    state.setVote(optionId, vote);
-  };
+  const { setVote } = state;
+  // What is being saved is what stays, so answers hold still until it lands.
+  // Read from a ref so the handler, and every row given it, stays the same.
+  const onVote = React.useCallback(
+    (optionId: string, vote: BallotVote, from: BallotVoteSource) => {
+      if (pendingRef.current) {
+        if (from === "radio") {
+          setStatus(
+            t("voteSaveInProgress", {
+              defaultValue:
+                "Your answers are still saving. Try again when that finishes.",
+            }),
+          );
+        }
+        return;
+      }
+      setAnswersBeforeShortcut(null);
+      setVote(optionId, vote);
+    },
+    [setVote, t],
+  );
 
   // Turning a shortcut off puts back whatever it replaced, so pressing one by
   // mistake costs nothing. Switching between them keeps the original answers.
@@ -554,6 +577,7 @@ export function AccessibleBallot({
     if (allMarked(vote)) {
       if (!answersBeforeShortcut) return;
       const before = answersBeforeShortcut;
+      capture("poll_vote:mark_all_click", { answer: vote, undo: true });
       state.setVotes(
         Object.fromEntries(
           votable.map((option) => [option.id, before[option.id] ?? null]),
@@ -570,6 +594,8 @@ export function AccessibleBallot({
     if (!answersBeforeShortcut) {
       setAnswersBeforeShortcut(state.answers);
     }
+    usedMarkAll.current = true;
+    capture("poll_vote:mark_all_click", { answer: vote, undo: false });
     state.setVotes(
       Object.fromEntries(votable.map((option) => [option.id, vote])),
     );
@@ -586,6 +612,12 @@ export function AccessibleBallot({
   const fail = (nextErrors: FieldError[], nextSaveError: string | null) => {
     setErrors(nextErrors);
     setSaveError(nextSaveError);
+    if (nextErrors.length > 0) {
+      capture("poll_vote:form_error", {
+        step: onDetailsStep ? "details" : "answers",
+        fields: nextErrors.map((error) => error.field),
+      });
+    }
     // After the errors have rendered. A field's error is read out as its
     // description; one with no field gets focus on the message itself.
     const first = nextErrors[0]?.field;
@@ -700,6 +732,10 @@ export function AccessibleBallot({
     }
     setPending(false);
     if (!result.ok) {
+      capture("poll_vote:save_error", {
+        reason: result.reason,
+        is_new: isNew,
+      });
       fail([], errorMessage(result.reason));
       return;
     }
@@ -708,11 +744,22 @@ export function AccessibleBallot({
     if (isNew) {
       // poll_response_submit is captured on the server under the guest's user
       // id, so it can't be joined to the browser's $pageview.
-      posthog?.capture("poll_response:form_submit", {
-        poll_id: ballot.pollId,
-        tier: poll.space?.tier,
+      // The same name as the old page, so the two compare. What the response
+      // holds goes with it, since the server's copy can't be joined either.
+      const countOf = (type: BallotVote) =>
+        votes.filter((vote) => vote.type === type).length;
+      capture("poll_response:form_submit", {
+        yes_count: countOf("yes"),
+        if_need_be_count: countOf("ifNeedBe"),
+        no_count: countOf("no"),
+        used_mark_all: usedMarkAll.current,
+        has_note: Boolean(String(data.get("note") ?? "").trim()),
       });
+    } else {
+      capture("poll_vote:changes_save");
     }
+    // The next response, after this one is deleted, starts with none used.
+    usedMarkAll.current = false;
     setStatus(
       isNew
         ? t("voteNoticeResponseSaved", { defaultValue: "Response saved" })
@@ -721,6 +768,7 @@ export function AccessibleBallot({
   };
 
   const discardChanges = () => {
+    capture("poll_vote:changes_discard");
     setErrors([]);
     setSaveError(null);
     setAnswersBeforeShortcut(null);
@@ -752,20 +800,6 @@ export function AccessibleBallot({
       })
     : [];
   const optionsById = new Map(ballot.options.map((o) => [o.id, o]));
-
-  const countDescription = (optionId: string, liveVote?: BallotVote) => {
-    if (!ballot.tallies) return null;
-    const count = availableCount({
-      entries: ballot.tallies[optionId] ?? [],
-      activeResponseId: state.activeResponseId,
-      liveVote,
-    });
-    return t("screenReaderOptionCount", {
-      defaultValue:
-        "{count, plural, =0 {No one has said they can make this yet} one {# person can make this} other {# people can make this}}",
-      count,
-    });
-  };
 
   /** What a row shows on screen; the day heading above it carries the date. */
   const rowTimeLabel = (option: Ballot["options"][number]): BallotTimeValue => {
@@ -815,25 +849,13 @@ export function AccessibleBallot({
 
   // Who answered what, for options whose count opens it. Not when the poll
   // withholds other people's names: there would be no one to list.
-  const renderBreakdown =
+  // The breakdown itself is worked out inside the popover, only while it is open.
+  const breakdownTimeZone =
     ballot.tallies && !ballot.hideParticipants
-      ? (optionId: string) => {
-          const option = optionsById.get(optionId);
-          return option && ballot.tallies ? (
-            <BallotBreakdown
-              option={option}
-              timeZone={ballot.isDatePoll ? null : ballot.timeZone}
-              total={total}
-              entries={optionBreakdown({
-                entries: ballot.tallies[optionId] ?? [],
-                activeResponseId: state.activeResponseId,
-                liveVote: state.answers[optionId],
-                viewerName: t("you", { defaultValue: "You" }),
-              })}
-            />
-          ) : null;
-        }
-      : null;
+      ? ballot.isDatePoll
+        ? null
+        : ballot.timeZone
+      : undefined;
 
   // Outside the voting form: React events cross portals, so the form in here
   // would submit that one too.
@@ -868,6 +890,7 @@ export function AccessibleBallot({
                 return;
               }
               detailsDialog.dismiss();
+              capture("poll_vote:name_save");
               setStatus(
                 t("screenReaderNameUpdated", {
                   defaultValue: "Your name was updated",
@@ -954,6 +977,8 @@ export function AccessibleBallot({
                   return;
                 }
                 deleteDialog.dismiss();
+                capture("poll_vote:response_delete");
+                usedMarkAll.current = false;
                 setJustSaved(null);
                 setStatus(
                   t("screenReaderAnswersDeleted", {
@@ -1066,14 +1091,15 @@ export function AccessibleBallot({
                   defaultValue: "{city} time. Change time zone",
                   city: getCityFromTimezoneId(viewerTimeZone),
                 })}
-                onChange={(id) =>
+                onChange={(id) => {
+                  capture("poll_vote:time_zone_change", { time_zone: id });
                   setStatus(
                     t("screenReaderTimeZoneChanged", {
                       defaultValue: "Times are now shown in {city} time",
                       city: getCityFromTimezoneId(id),
                     }),
-                  )
-                }
+                  );
+                }}
               />
             ),
           }}
@@ -1082,7 +1108,8 @@ export function AccessibleBallot({
     ) : null;
   const timeFormatSwitcher = ballot.isDatePoll ? null : (
     <TimeFormatSwitcher
-      onChange={(format) =>
+      onChange={(format) => {
+        capture("poll_vote:time_format_change", { time_format: format });
         setStatus(
           format === "hours12"
             ? t("screenReaderTimeFormat12", {
@@ -1091,8 +1118,8 @@ export function AccessibleBallot({
             : t("screenReaderTimeFormat24", {
                 defaultValue: "Times are now shown in 24-hour format",
               }),
-        )
-      }
+        );
+      }}
     />
   );
   const timeControls = timeFormatSwitcher ? (
@@ -1116,7 +1143,7 @@ export function AccessibleBallot({
         // 2px is the card's border.
         "lg:flex-none",
         compactCard
-          ? "lg:h-[min(36rem,calc(100dvh-8rem-2px))] lg:w-auto lg:grid-cols-[20rem_28rem] xl:h-[min(39rem,calc(100dvh-8rem-2px))] xl:grid-cols-[24rem_28rem]"
+          ? "lg:h-[min(27rem,calc(100dvh-8rem-2px))] lg:w-auto lg:grid-cols-[20rem_28rem] xl:grid-cols-[24rem_28rem]"
           : "lg:h-[min(calc(100dvh-8rem-2px),calc(min(100vw-2rem,64rem)*0.75))] lg:w-[calc(100vw-2rem)] lg:max-w-5xl lg:grid-cols-[20rem_minmax(0,1fr)] xl:grid-cols-[24rem_minmax(0,1fr)]",
         compactOnPhone ? "max-lg:gap-y-4" : "max-lg:gap-y-6",
         // Below lg the title sits in the header, so the description that
@@ -1176,7 +1203,7 @@ export function AccessibleBallot({
 
         {/* A visual key for the icon-only answers; the radios name themselves. */}
         {/* Only beside the options it is a key to. */}
-        {ballot.canRespond && !compactCard ? (
+        {ballot.canRespond && !showThanks ? (
           <div
             aria-hidden="true"
             className={cn(compactOnPhone && "max-lg:hidden")}
@@ -1186,26 +1213,22 @@ export function AccessibleBallot({
             />
           </div>
         ) : null}
-        {/* Signs off the sidebar. */}
         {poll.user ? (
-          <div
-            className={cn(
-              "flex items-center gap-3 text-sm lg:mt-auto",
-              compactOnPhone && "max-lg:hidden",
-            )}
-          >
-            <span aria-hidden="true" className="flex shrink-0">
-              <OptimizedAvatarImage
-                size="lg"
-                src={poll.user.image ?? undefined}
-                name={poll.user.name}
-              />
-            </span>
-            <div className="min-w-0">
-              <p className="truncate font-medium">{poll.user.name}</p>
-              <p className="text-muted-foreground text-xs">
-                <Trans i18nKey="eventHeaderOrganizer" defaults="Organizer" />
-              </p>
+          <div className={cn("text-sm", compactOnPhone && "max-lg:hidden")}>
+            <h2 className="font-normal text-muted-foreground">
+              <Trans i18nKey="eventHeaderOrganizer" defaults="Organizer" />
+            </h2>
+            {/* Centred on the icons above, so the name starts where their labels do. */}
+            <div className="mt-1 -ml-0.5 flex items-center gap-1.5">
+              <span aria-hidden="true" className="flex shrink-0">
+                <OptimizedAvatarImage
+                  size="sm"
+                  className="size-5"
+                  src={poll.user.image ?? undefined}
+                  name={poll.user.name}
+                />
+              </span>
+              <span className="min-w-0 truncate">{poll.user.name}</span>
             </div>
           </div>
         ) : null}
@@ -1347,6 +1370,7 @@ export function AccessibleBallot({
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem
                     onClick={() => {
+                      capture("poll_vote:change_name_click");
                       setDetailsError(null);
                       detailsDialog.trigger();
                     }}
@@ -1360,6 +1384,7 @@ export function AccessibleBallot({
                   <DropdownMenuItem
                     variant="destructive"
                     onClick={() => {
+                      capture("poll_vote:delete_response_click");
                       setDeleteError(null);
                       deleteDialog.trigger();
                     }}
@@ -1423,6 +1448,7 @@ export function AccessibleBallot({
               type="button"
               className="mt-6 rounded-xl"
               onClick={() => {
+                capture("poll_vote:view_response_click");
                 // So the card grows back to the answers rather than jumping.
                 cardBefore.current =
                   mainRef.current
@@ -1483,32 +1509,41 @@ export function AccessibleBallot({
             <h2 id="result-heading" tabIndex={-1} className="sr-only">
               <Trans i18nKey="voteResultsPanelLabel" defaults="Results" />
             </h2>
-            {poll.status === "scheduled" && poll.event && !chosenOptionId ? (
-              <p className="flex flex-wrap gap-x-2 font-medium text-sm">
-                <EventDate
-                  value={poll.event.start}
-                  allDay={poll.event.duration === 0}
-                  timeZone={poll.timeZone}
-                  preset="dateFull"
+            {poll.status === "scheduled" && poll.event ? (
+              <div className="mb-2 flex flex-col items-start gap-3">
+                {chosenOptionId ? null : (
+                  <p className="flex flex-wrap gap-x-2 font-medium text-sm">
+                    <EventDate
+                      value={poll.event.start}
+                      allDay={poll.event.duration === 0}
+                      timeZone={poll.timeZone}
+                      preset="dateFull"
+                    />
+                    <EventTimeRange
+                      start={poll.event.start}
+                      end={
+                        new Date(
+                          poll.event.start.getTime() +
+                            poll.event.duration * 60_000,
+                        )
+                      }
+                      allDay={poll.event.duration === 0}
+                      timeZone={poll.timeZone}
+                      showTimeZone
+                    />
+                  </p>
+                )}
+                <AddToCalendarButton
+                  eventId={poll.event.id}
+                  className="rounded-xl"
                 />
-                <EventTimeRange
-                  start={poll.event.start}
-                  end={
-                    new Date(
-                      poll.event.start.getTime() + poll.event.duration * 60_000,
-                    )
-                  }
-                  allDay={poll.event.duration === 0}
-                  timeZone={poll.timeZone}
-                  showTimeZone
-                />
-              </p>
+              </div>
             ) : null}
             {timeControls}
             {past.ids.size > 0 && votable.length > 0 ? (
               <p className="mt-3 flex flex-wrap gap-2">
                 <PastTimesToggle
-                  past={past}
+                  past={trackedPast}
                   labelled={true}
                   className="rounded-xl"
                 />
@@ -1522,7 +1557,7 @@ export function AccessibleBallot({
                     <h3 className="font-normal text-sm">
                       <BallotTimeText
                         value={dayHeading(first, group.key)}
-                        changed={timesChanged}
+                        changedAt={timesChangedAt}
                       />
                     </h3>
                     <ul className="flex flex-col gap-1.5">
@@ -1534,7 +1569,7 @@ export function AccessibleBallot({
                           <BallotBarOption
                             key={optionId}
                             label={rowTimeLabel(option)}
-                            timesChanged={timesChanged}
+                            timesChangedAt={timesChangedAt}
                             fullLabel={optionLabel(option)}
                             vote={vote}
                             canVote={false}
@@ -1546,14 +1581,29 @@ export function AccessibleBallot({
                             count={
                               ballot.tallies
                                 ? availableCount({
-                                    entries: ballot.tallies[optionId] ?? [],
+                                    tallies: ballot.tallies,
+                                    votes: ballot.tallies.votes[optionId] ?? [],
                                     activeResponseId: state.activeResponseId,
                                     liveVote: vote,
                                   })
                                 : undefined
                             }
                             total={total}
-                            breakdown={renderBreakdown?.(optionId)}
+                            breakdown={
+                              ballot.tallies &&
+                              breakdownTimeZone !== undefined ? (
+                                <BallotOptionBreakdown
+                                  option={option}
+                                  timeZone={breakdownTimeZone}
+                                  total={total}
+                                  tallies={ballot.tallies}
+                                  votes={ballot.tallies.votes[optionId] ?? []}
+                                  activeResponseId={state.activeResponseId}
+                                  liveVote={vote}
+                                />
+                              ) : undefined
+                            }
+                            onBreakdownOpen={captureBreakdownOpen}
                           />
                         );
                       })}
@@ -1575,9 +1625,9 @@ export function AccessibleBallot({
             }}
             aria-labelledby={onDetailsStep ? "details-heading" : "form-heading"}
             className={cn(
-              "flex flex-col",
+              "flex flex-col lg:flex-1",
               stepMotion,
-              onDetailsStep && "mx-auto mb-6 w-full max-w-lg lg:flex-1",
+              onDetailsStep && "mx-auto w-full max-w-lg max-lg:mb-6",
             )}
           >
             {onDetailsStep ? (
@@ -1594,7 +1644,8 @@ export function AccessibleBallot({
               className={cn(
                 onDetailsStep
                   ? "hidden"
-                  : "flex flex-col [&>#availability+*]:mt-0",
+                  : // Grows so the footer after it sits at the foot of the card.
+                    "flex flex-col lg:flex-1 [&>#availability+*]:mt-0",
                 // The footer leaves room after the options; without it they
                 // need their own, or the last one sits on the panel's edge.
                 !showFooter && "pb-6",
@@ -1677,7 +1728,7 @@ export function AccessibleBallot({
                   ) : null}
                   {past.ids.size > 0 && votable.length > 0 ? (
                     <PastTimesToggle
-                      past={past}
+                      past={trackedPast}
                       labelled={true}
                       className="rounded-full"
                     />
@@ -1693,176 +1744,48 @@ export function AccessibleBallot({
                       <h3 className="font-normal text-sm">
                         <BallotTimeText
                           value={dayHeading(first, group.key)}
-                          changed={timesChanged}
+                          changedAt={timesChangedAt}
                         />
                       </h3>
                       {group.optionIds.map((optionId) => {
                         const option = optionsById.get(optionId);
                         if (!option) return null;
-                        const vote = state.answers[optionId];
-                        const count = countDescription(optionId, vote);
-                        const countId = `count-${optionId}`;
                         // Past times cannot be attended, so they only show here.
                         const isPast = past.ids.has(optionId);
-                        const liveCount = ballot.tallies
-                          ? availableCount({
-                              entries: ballot.tallies[optionId] ?? [],
-                              activeResponseId: state.activeResponseId,
-                              liveVote: vote,
-                            })
-                          : null;
+                        const timeLabel = rowTimeLabel(option);
                         return (
-                          // biome-ignore lint/a11y/useKeyWithClickEvents: a click and tap shortcut; the radios inside are the keyboard path
-                          <fieldset
+                          <BallotVoteRow
                             key={optionId}
-                            aria-describedby={count ? countId : undefined}
-                            disabled={isPast}
-                            onClick={(event) => {
-                              // A click or a tap, never for the radios themselves:
-                              // assistive technology activates those directly.
-                              if (
-                                isPast ||
-                                pending ||
-                                (event.target as Element).closest(
-                                  "label, button",
-                                )
-                              )
-                                return;
-                              answerOne(
-                                optionId,
-                                nextVote(vote, ballot.allowTentativeVotes),
-                              );
-                            }}
-                            className={cn(
-                              "group relative isolate flex min-h-12.5 min-w-0 flex-wrap items-center gap-x-3 gap-y-2 overflow-hidden rounded-xl border bg-card py-1.5 pr-3.5 pl-3 lg:[@media(pointer:fine)]:min-h-10 lg:[@media(pointer:fine)]:py-0",
+                            option={option}
+                            vote={state.answers[optionId]}
+                            isPast={isPast}
+                            allowTentativeVotes={ballot.allowTentativeVotes}
+                            legend={
                               isPast
-                                ? "opacity-60"
-                                : [
-                                    "cursor-pointer touch-manipulation [-webkit-tap-highlight-color:transparent]",
-                                    rowHoverClassName[vote ?? "none"],
-                                  ],
-                              vote === "yes" &&
-                                "border-green-400 dark:border-green-500/60",
-                              vote === "ifNeedBe" &&
-                                "border-amber-400 dark:border-amber-500/60",
-                            )}
-                          >
-                            {/* The full date for readers; the day heading above carries it on screen. */}
-                            <legend className="sr-only">
-                              {isPast
                                 ? t("screenReaderPastOption", {
                                     defaultValue: "{option} (already passed)",
                                     option: votingLabel(option),
                                   })
-                                : votingLabel(option)}
-                            </legend>
-                            {liveCount !== null && total > 0 ? (
-                              <span
-                                aria-hidden="true"
-                                className={cn(
-                                  "absolute inset-y-0 left-0 -z-10 transition-[width,background-color] duration-200 motion-reduce:transition-none",
-                                  vote === "yes"
-                                    ? "bg-green-100 dark:bg-green-500/25"
-                                    : vote === "ifNeedBe"
-                                      ? "bg-amber-100 dark:bg-amber-500/25"
-                                      : "bg-gray-200 dark:bg-white/10",
-                                )}
-                                style={{
-                                  width: `${Math.round((liveCount / total) * 100)}%`,
-                                }}
-                              />
-                            ) : null}
-                            {/* The row shows one mark, as the answer it cycles. */}
-                            <BallotVoteMark vote={vote} />
-                            <span
-                              aria-hidden="true"
-                              className="flex min-h-9 min-w-0 flex-1 items-center text-sm tabular-nums lg:[@media(pointer:fine)]:min-h-9.5"
-                            >
-                              <BallotTimeText
-                                value={rowTimeLabel(option)}
-                                changed={timesChanged}
-                              />
-                            </span>
-                            {liveCount !== null ? (
-                              <span
-                                aria-hidden={renderBreakdown ? undefined : true}
-                                className="[&_[data-testid=ballot-tally]]:text-foreground"
-                              >
-                                <BallotCount
-                                  value={liveCount}
-                                  breakdown={renderBreakdown?.(optionId)}
-                                />
-                              </span>
-                            ) : null}
-                            {count ? (
-                              <p id={countId} className="sr-only">
-                                {count}
-                              </p>
-                            ) : null}
-                            {/* Shrunk away until the keyboard reaches them, and still in
-    the tree for a screen reader to step through. */}
-                            <div
-                              className={cn(
-                                "flex gap-x-3 gap-y-2",
-                                radiosUntilKeyboardClassName,
-                              )}
-                            >
-                              {answerChoices.map((choice) => (
-                                <label
-                                  key={choice}
-                                  className={cn(
-                                    "relative block",
-                                    radioUntilKeyboardClassName,
-                                  )}
-                                >
-                                  <input
-                                    type="radio"
-                                    className="peer absolute inset-0 z-10 m-0 size-full cursor-pointer scroll-mt-16 scroll-mb-24 opacity-0"
-                                    name={`vote-${optionId}`}
-                                    value={choice}
-                                    checked={vote === choice}
-                                    onChange={() => {
-                                      // What is being saved is what stays, so
-                                      // answers hold still until it lands.
-                                      if (pending) {
-                                        setStatus(
-                                          t("voteSaveInProgress", {
-                                            defaultValue:
-                                              "Your answers are still saving. Try again when that finishes.",
-                                          }),
-                                        );
-                                      } else {
-                                        answerOne(optionId, choice);
-                                      }
-                                    }}
-                                  />
-                                  <span
-                                    aria-hidden="true"
-                                    className={cn(
-                                      "flex size-9 items-center justify-center rounded-full border bg-background outline-ring outline-offset-2 transition-[border-color] duration-150 peer-checked:border-2 peer-focus-visible:outline-2 motion-reduce:transition-none [&_svg]:brightness-75 [&_svg]:grayscale peer-checked:[&_svg]:brightness-100 peer-checked:[&_svg]:grayscale-0 lg:[@media(pointer:fine)]:size-6",
-                                      // One colour per answer in every state;
-                                      // only its strength changes.
-                                      choice === "yes" &&
-                                        "border-green-600/40 peer-checked:border-green-600 peer-hover:border-green-600/70",
-                                      choice === "ifNeedBe" &&
-                                        "border-amber-500/40 peer-checked:border-amber-500 peer-hover:border-amber-500/70",
-                                      choice === "no" &&
-                                        "border-gray-500/40 peer-checked:border-gray-500 peer-hover:border-gray-500/70 dark:border-gray-400/40 dark:peer-hover:border-gray-400/70 dark:peer-checked:border-gray-400",
-                                    )}
-                                  >
-                                    <VoteIcon
-                                      round
-                                      type={choice}
-                                      className="size-5 lg:[@media(pointer:fine)]:size-4"
-                                    />
-                                  </span>
-                                  <span className="sr-only">
-                                    {answerLabels[choice]}
-                                  </span>
-                                </label>
-                              ))}
-                            </div>
-                          </fieldset>
+                                : votingLabel(option)
+                            }
+                            label={
+                              typeof timeLabel === "string"
+                                ? timeLabel
+                                : timeLabel.day
+                            }
+                            weekday={
+                              typeof timeLabel === "string"
+                                ? undefined
+                                : timeLabel.weekday
+                            }
+                            timesChangedAt={timesChangedAt}
+                            total={total}
+                            tallies={ballot.tallies}
+                            activeResponseId={state.activeResponseId}
+                            breakdownTimeZone={breakdownTimeZone}
+                            onBreakdownOpen={captureBreakdownOpen}
+                            onVote={onVote}
+                          />
                         );
                       })}
                     </section>
@@ -1903,6 +1826,7 @@ export function AccessibleBallot({
                     required
                     maxLength={100}
                     autoComplete="name"
+                    defaultValue={defaultName}
                     className="scroll-mt-6"
                     aria-invalid={errorFor("name") ? true : undefined}
                     // Focus can land here, past the heading, so it names the step too.
@@ -1938,6 +1862,7 @@ export function AccessibleBallot({
                       type="email"
                       required={ballot.requireParticipantEmail}
                       autoComplete="email"
+                      defaultValue={defaultEmail}
                       className="scroll-mt-6"
                       aria-invalid={errorFor("email") ? true : undefined}
                       aria-describedby={
@@ -1950,7 +1875,11 @@ export function AccessibleBallot({
                       align="inline-end"
                       className={fieldAddonClassName}
                     >
-                      <Popover>
+                      <Popover
+                        onOpenChange={(open) => {
+                          if (open) capture("poll_vote:email_why_open");
+                        }}
+                      >
                         <PopoverTrigger
                           render={
                             <InputGroupButton
@@ -2045,8 +1974,11 @@ export function AccessibleBallot({
                             defaultValue: "Remove note",
                           })}
                           onClick={() => {
-                            setShowNote(false);
-                            noteRemoved.current = true;
+                            capture("poll_vote:note_remove");
+                            // The button that was pressed is gone, so focus
+                            // goes to the one that replaced it.
+                            flushSync(() => setShowNote(false));
+                            document.getElementById("add-note")?.focus();
                           }}
                         >
                           <TrashIcon aria-hidden="true" />
@@ -2065,7 +1997,10 @@ export function AccessibleBallot({
                     id="add-note"
                     type="button"
                     className="self-start rounded-full"
-                    onClick={() => setShowNote(true)}
+                    onClick={() => {
+                      capture("poll_vote:note_add");
+                      setShowNote(true);
+                    }}
                   >
                     <PlusIcon aria-hidden="true" data-icon="inline-start" />
                     <Trans
@@ -2078,12 +2013,15 @@ export function AccessibleBallot({
             ) : null}
 
             {isNew && votable.length === 0 ? (
-              <p className="py-6 text-muted-foreground text-sm">
-                <Trans
-                  i18nKey="voteAllOptionsPassed"
-                  defaults="All of these times have passed, so there is nothing left to answer. Contact the organizer if you still want to respond."
-                />
-              </p>
+              <Alert className="my-6">
+                <HistoryIcon />
+                <AlertDescription>
+                  <Trans
+                    i18nKey="voteAllOptionsPassed"
+                    defaults="All of these times have passed, so there is nothing left to answer. Contact the organizer if you still want to respond."
+                  />
+                </AlertDescription>
+              </Alert>
             ) : showFooter ? (
               // For a saved response this is only here once there is something
               // to save, or to say it was saved.
@@ -2091,7 +2029,8 @@ export function AccessibleBallot({
                 className={cn(
                   "flex flex-col gap-2",
                   onDetailsStep
-                    ? "pt-6 lg:mt-auto"
+                    ? // The card is short, so a note can push this past its foot.
+                      "pt-6 lg:sticky lg:bottom-0 lg:z-20 lg:mt-auto lg:bg-card/70 lg:pb-6 lg:backdrop-blur-md"
                     : "sticky bottom-0 z-20 mt-6 bg-card/70 py-3 backdrop-blur-md max-lg:-mx-4 max-lg:px-4 lg:-mx-8 lg:px-8",
                   // For a saved response it arrives with the first change, so it
                   // rises into place rather than popping in.

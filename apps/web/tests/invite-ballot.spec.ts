@@ -434,6 +434,41 @@ test.describe("invite ballot", () => {
     await context.close();
   });
 
+  test("a signed-in viewer's name and email are already filled in", async ({
+    browser,
+  }) => {
+    const email = "ballot-spec-member@example.com";
+    await prisma.user.deleteMany({ where: { email } });
+    await createUserInDb({ email, name: "Ballot Member" });
+    await seedPoll({ id: "ballot-spec-prefill" });
+
+    const guest = await freshPage(browser);
+    await guest.page.goto("/invite/ballot-spec-prefill/vote");
+    await answer(options(guest.page).nth(0), "Yes");
+    await guest.page.getByRole("button", { name: "Continue" }).click();
+    await expect(guest.page.getByLabel("Name")).toHaveValue("");
+    await expect(
+      guest.page.getByRole("textbox", { name: "Email" }),
+    ).toHaveValue("");
+    await guest.context.close();
+
+    const member = await freshPage(browser);
+    await loginWithEmail(member.page, { email });
+    await member.page.goto("/invite/ballot-spec-prefill/vote");
+    await answer(options(member.page).nth(0), "Yes");
+    await member.page.getByRole("button", { name: "Continue" }).click();
+    await expect(member.page.getByLabel("Name")).toHaveValue("Ballot Member");
+    await expect(
+      member.page.getByRole("textbox", { name: "Email" }),
+    ).toHaveValue(email);
+    await member.page.getByRole("button", { name: "Confirm" }).click();
+    await expect(
+      member.page.getByRole("heading", { name: "Thanks, Ballot Member" }),
+    ).toBeVisible();
+    await member.context.close();
+    await prisma.user.deleteMany({ where: { email } });
+  });
+
   test("hide scores hides counts until responding", async ({ browser }) => {
     await seedPoll({ id: "ballot-spec-scores", hideScores: true });
     const { context, page } = await freshPage(browser);
@@ -480,5 +515,98 @@ test.describe("invite ballot", () => {
     await expect(creator.page).toHaveURL(/\/poll\/ballot-spec-manage$/);
     await creator.context.close();
     await prisma.user.deleteMany({ where: { email } });
+  });
+
+  test("following an emailed invite link records the open", async ({
+    browser,
+  }) => {
+    await seedPoll({ id: "ballot-spec-open" });
+    const token = randomUUID().replace(/-/g, "");
+    const invite = await prisma.pollInvite.create({
+      data: {
+        pollId: "ballot-spec-open",
+        email: "ballot-spec-open@example.com",
+        token,
+      },
+    });
+    const { context, page } = await freshPage(browser);
+    await page.goto(`/invite/ballot-spec-open/vote?token=${token}`);
+
+    await expect
+      .poll(async () => {
+        const row = await prisma.pollInvite.findUniqueOrThrow({
+          where: { id: invite.id },
+          select: { openedAt: true },
+        });
+        return row.openedAt;
+      })
+      .not.toBeNull();
+    await context.close();
+  });
+
+  test("a scheduled poll can be added to a calendar", async ({ browser }) => {
+    const email = "ballot-spec-scheduled@example.com";
+    const eventId = "ballot-spec-scheduled-event";
+    await prisma.scheduledEvent.deleteMany({ where: { id: eventId } });
+    await prisma.user.deleteMany({ where: { email } });
+    const host = await createUserInDb({ email, name: "Ballot Host" });
+    const space = await prisma.space.findFirstOrThrow({
+      where: { ownerId: host.id },
+    });
+    await seedPoll({ id: "ballot-spec-scheduled" });
+    const option = await prisma.option.findUniqueOrThrow({
+      where: { id: "ballot-spec-scheduled-o0" },
+    });
+    await prisma.scheduledEvent.create({
+      data: {
+        id: eventId,
+        uid: `${eventId}@rallly.co`,
+        userId: host.id,
+        spaceId: space.id,
+        title: "Ballot ballot-spec-scheduled",
+        timeZone: "UTC",
+        start: option.startTime,
+        end: new Date(option.startTime.getTime() + 60 * 60 * 1000),
+      },
+    });
+    await prisma.poll.update({
+      where: { id: "ballot-spec-scheduled" },
+      data: {
+        userId: host.id,
+        spaceId: space.id,
+        status: "scheduled",
+        scheduledEventId: eventId,
+      },
+    });
+
+    const { context, page } = await freshPage(browser);
+    await page.goto("/invite/ballot-spec-scheduled/vote");
+
+    await page.getByRole("button", { name: "Add to calendar" }).click();
+    await expect(
+      page.getByRole("menuitem", { name: "Google Calendar" }),
+    ).toHaveAttribute("href", `/api/event/${eventId}/google-calendar`);
+    await context.close();
+    await prisma.user.deleteMany({ where: { email } });
+  });
+
+  test("a shared link has a preview card", async ({ browser }) => {
+    await seedPoll({ id: "ballot-spec-preview" });
+    const { context, page } = await freshPage(browser);
+    await page.goto("/invite/ballot-spec-preview/vote");
+
+    await expect(page.locator('meta[property="og:title"]')).toHaveAttribute(
+      "content",
+      "Ballot ballot-spec-preview",
+    );
+    await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
+      "content",
+      /\/api\/og-image-poll\?/,
+    );
+    await expect(page.locator('meta[property="og:url"]')).toHaveAttribute(
+      "content",
+      /\/invite\/ballot-spec-preview$/,
+    );
+    await context.close();
   });
 });

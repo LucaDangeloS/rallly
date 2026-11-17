@@ -1,10 +1,10 @@
-import { buttonVariants, cn } from "@rallly/ui";
-import { ArrowUpRightIcon } from "lucide-react";
+import { cn } from "@rallly/ui";
+import { absoluteUrl } from "@rallly/utils/absolute-url";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { InstanceFooterLinks } from "@/components/instance-footer-links";
-import { Link } from "@/components/link";
+import { SessionRefresher } from "@/components/session-refresher";
 import { Spinner } from "@/components/spinner";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Logo } from "@/features/branding/components/logo";
@@ -15,11 +15,16 @@ import {
 import { loadInstanceBranding } from "@/features/branding/loaders";
 import { loadFooterLinks } from "@/features/instance-settings/loaders";
 import { EventMetaDescription } from "@/features/poll/components/event-meta-description";
+import { InviteOpenRecorder } from "@/features/poll/invite/components/invite-open-recorder";
 import { PollUnavailable } from "@/features/poll/invite/components/poll-unavailable";
 import { loadInviteBallot } from "@/features/poll/invite/loaders";
 import { loadPollAvailability, loadPollDetails } from "@/features/poll/loaders";
 import { PoweredByLink } from "@/features/poll/vote/components/powered-by-link";
-import { loadCanManagePoll } from "@/features/poll/vote/loaders";
+import {
+  loadCanManagePoll,
+  loadOptionalResponder,
+  loadVoteComments,
+} from "@/features/poll/vote/loaders";
 import { getTranslation } from "@/i18n/server";
 import { isFeatureEnabled } from "@/lib/feature-flags/server";
 import { AccessibleBallot } from "./components/accessible-ballot";
@@ -27,6 +32,8 @@ import { CollapsibleDescription } from "./components/collapsible-description";
 import { EventLockup } from "./components/event-lockup";
 import { InviteHelp } from "./components/help/invite-help";
 import { InviteHelpSheet } from "./components/help/invite-help-sheet";
+import { ManagePollLink } from "./components/manage-poll-link";
+import { VoteComments, VoteCommentsSheet } from "./components/vote-comments";
 
 type PageProps = {
   params: Promise<{ urlId: string }>;
@@ -49,10 +56,31 @@ function getInviteToken({
   return first(token) ?? first(invite);
 }
 
+// Started ahead of the availability check, so a branch that returns early may
+// never await it. Marked handled so its rejection cannot go unhandled; an
+// await still sees the error.
+function startEarly<T>(promise: Promise<T>) {
+  promise.catch(() => {});
+  return promise;
+}
+
 async function PageContent({ params, searchParams }: PageProps) {
   const { urlId } = await params;
-  const [availability, { token: tokenParam, invite: inviteParam }] =
-    await Promise.all([loadPollAvailability(urlId), searchParams]);
+  const responderRead = startEarly(loadOptionalResponder());
+  const footerLinksRead = startEarly(loadFooterLinks());
+  const tokenRead = startEarly(searchParams.then(getInviteToken));
+  const rest = startEarly(
+    Promise.all([
+      loadPollDetails(urlId),
+      tokenRead.then((token) => loadInviteBallot(urlId, token)),
+      loadInstanceBranding(),
+      loadCanManagePoll(urlId),
+      getTranslation(),
+      loadVoteComments(urlId),
+    ]),
+  );
+
+  const availability = await loadPollAvailability(urlId);
 
   if (!availability) {
     notFound();
@@ -62,25 +90,22 @@ async function PageContent({ params, searchParams }: PageProps) {
     return (
       <PollUnavailable
         reason={availability.unavailable}
-        footerLinks={await loadFooterLinks()}
+        footerLinks={await footerLinksRead}
       />
     );
   }
 
-  const token = getInviteToken({ token: tokenParam, invite: inviteParam });
-  const { t } = await getTranslation();
-  const [poll, ballot, instanceBranding, footerLinks, canManage] =
-    await Promise.all([
-      loadPollDetails(urlId),
-      loadInviteBallot({ pollId: urlId, token }),
-      loadInstanceBranding(),
-      loadFooterLinks(),
-      loadCanManagePoll(urlId),
-    ]);
+  const [
+    [poll, ballot, instanceBranding, canManage, { t }, comments],
+    footerLinks,
+    token,
+  ] = await Promise.all([rest, footerLinksRead, tokenRead]);
 
   if (!poll || !ballot) {
     notFound();
   }
+
+  const responder = await responderRead;
 
   // The Rallly logo stays off this page. An instance's own logo is its
   // operator's brand, so that one still shows.
@@ -112,6 +137,8 @@ async function PageContent({ params, searchParams }: PageProps) {
 
   return (
     <>
+      <SessionRefresher />
+      {token ? <InviteOpenRecorder pollId={poll.id} token={token} /> : null}
       {/* First in the reading order, and outside the card from lg. */}
       <header
         className={cn(
@@ -128,15 +155,22 @@ async function PageContent({ params, searchParams }: PageProps) {
           ) : null}
           <div className="ml-auto flex h-12 shrink-0 items-center gap-1">
             {canManage ? (
-              <Link
-                className={cn(buttonVariants({ size: "sm" }), "mr-1")}
-                href={`/poll/${poll.id}`}
-              >
+              <ManagePollLink pollId={poll.id}>
                 {t("managePoll", { defaultValue: "Manage poll" })}
-                <ArrowUpRightIcon data-icon="inline-end" />
-              </Link>
+              </ManagePollLink>
             ) : null}
-            <InviteHelpSheet>
+            {poll.disableComments ? null : (
+              <VoteCommentsSheet pollId={poll.id} count={comments.length}>
+                <VoteComments
+                  pollId={poll.id}
+                  comments={comments}
+                  canComment={!poll.event}
+                  signedInName={responder?.name}
+                  defaultName={ballot.ownResponses[0]?.name}
+                />
+              </VoteCommentsSheet>
+            )}
+            <InviteHelpSheet pollId={poll.id}>
               <Suspense
                 fallback={
                   <div className="flex flex-1 items-center justify-center">
@@ -166,6 +200,8 @@ async function PageContent({ params, searchParams }: PageProps) {
         <AccessibleBallot
           poll={poll}
           ballot={ballot}
+          defaultName={responder?.name}
+          defaultEmail={responder?.email}
           showCreatePollPrompt={
             !hideAttribution && isFeatureEnabled("createPollPrompt")
           }
@@ -180,7 +216,7 @@ async function PageContent({ params, searchParams }: PageProps) {
           }
           description={
             poll.description ? (
-              <CollapsibleDescription>
+              <CollapsibleDescription pollId={poll.id}>
                 <EventMetaDescription
                   className="mt-2 text-base/7 text-muted-foreground lg:text-sm/6"
                   content={poll.description}
@@ -225,9 +261,36 @@ export async function generateMetadata(props: {
   const { urlId } = await props.params;
   const availability = await loadPollAvailability(urlId);
 
+  if (!availability) {
+    notFound();
+  }
+
+  // Not linked from anywhere yet, so it stays out of search.
+  const robots = { index: false, follow: false };
+
+  if (availability.unavailable) {
+    return { title: "Poll unavailable", robots };
+  }
+
+  const { title, id, authorName } = availability;
+
   return {
-    title: availability?.unavailable ? "Poll unavailable" : availability?.title,
-    // Not linked from anywhere yet, so it stays out of search.
-    robots: { index: false, follow: false },
+    title,
+    metadataBase: new URL(absoluteUrl()),
+    openGraph: {
+      title,
+      description: `By ${authorName}`,
+      // The address people share, which this page will take over.
+      url: `/invite/${id}`,
+      images: [
+        {
+          url: absoluteUrl("/api/og-image-poll", { title, author: authorName }),
+          width: 1200,
+          height: 630,
+          alt: title,
+        },
+      ],
+    },
+    robots,
   };
 }

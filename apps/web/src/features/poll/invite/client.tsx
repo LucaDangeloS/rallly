@@ -27,12 +27,17 @@ function initialMode(ballot: Ballot): BallotMode {
  */
 export function useBallotState({ ballot }: { ballot: Ballot }) {
   // Key order is not guaranteed by the read, so the signature sorts it:
-  // the same saved response must never look like a new one.
-  const ownSignature = JSON.stringify(
-    ballot.ownResponses.map((response) => [
-      response.id,
-      Object.entries(response.votes).sort(([a], [b]) => a.localeCompare(b)),
-    ]),
+  // the same saved response must never look like a new one. Every page render
+  // from the server sends a new array, so the memo never hides a change.
+  const ownSignature = React.useMemo(
+    () =>
+      JSON.stringify(
+        ballot.ownResponses.map((response) => [
+          response.id,
+          Object.entries(response.votes).sort(([a], [b]) => a.localeCompare(b)),
+        ]),
+      ),
+    [ballot.ownResponses],
   );
   const [seededFrom, setSeededFrom] = React.useState(ownSignature);
   const [mode, setMode] = React.useState<BallotMode>(() => initialMode(ballot));
@@ -63,6 +68,32 @@ export function useBallotState({ ballot }: { ballot: Ballot }) {
   }
 
   const canChange = ballot.canRespond;
+  // Stable, so memoized rows can take them.
+  const setVote = React.useCallback(
+    (optionId: string, vote: BallotVote) => {
+      if (!canChange) return;
+      setAnswers((current) => ({ ...current, [optionId]: vote }));
+    },
+    [canChange],
+  );
+  /** Sets several answers at once; null clears an answer. */
+  const setVotes = React.useCallback(
+    (votes: Record<string, BallotVote | null>) => {
+      if (!canChange) return;
+      setAnswers((current) => {
+        const next = { ...current };
+        for (const [optionId, vote] of Object.entries(votes)) {
+          if (vote) {
+            next[optionId] = vote;
+          } else {
+            delete next[optionId];
+          }
+        }
+        return next;
+      });
+    },
+    [canChange],
+  );
   // An unanswered option is saved as no, so the two compare as equal.
   const hasChanges =
     mode === "saved" &&
@@ -83,25 +114,8 @@ export function useBallotState({ ballot }: { ballot: Ballot }) {
       setAnswers(votes);
       setSavedAnswers(votes);
     },
-    setVote: (optionId: string, vote: BallotVote) => {
-      if (!canChange) return;
-      setAnswers((current) => ({ ...current, [optionId]: vote }));
-    },
-    /** Sets several answers at once; null clears an answer. */
-    setVotes: (votes: Record<string, BallotVote | null>) => {
-      if (!canChange) return;
-      setAnswers((current) => {
-        const next = { ...current };
-        for (const [optionId, vote] of Object.entries(votes)) {
-          if (vote) {
-            next[optionId] = vote;
-          } else {
-            delete next[optionId];
-          }
-        }
-        return next;
-      });
-    },
+    setVote,
+    setVotes,
     /** After a successful save: what is chosen is now what is saved. */
     markSaved: () => setSavedAnswers(answers),
     discardChanges: () => setAnswers(savedAnswers),
@@ -146,6 +160,22 @@ export function usePastOptions({ ballot }: { ballot: Ballot }) {
 }
 
 export type PastOptions = ReturnType<typeof usePastOptions>;
+
+/**
+ * When the viewer last changed the time zone or format, so the times that
+ * moved can flash. A ref, so marking a change renders nothing more.
+ */
+export function useTimesChangedAt(displayKey: string) {
+  const changedAt = React.useRef(Number.NEGATIVE_INFINITY);
+  const previous = React.useRef(displayKey);
+  // A layout effect, so it is set before the times' own effects read it.
+  React.useLayoutEffect(() => {
+    if (previous.current === displayKey) return;
+    previous.current = displayKey;
+    changedAt.current = performance.now();
+  }, [displayKey]);
+  return changedAt;
+}
 
 /**
  * The token from an emailed link: a response's edit token, an invite token,
