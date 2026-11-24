@@ -11,17 +11,17 @@ import {
   EmptyStateIcon,
   EmptyStateTitle,
 } from "@/components/empty-state";
-import { FilterPills } from "@/components/filter-pills";
+import { FilterTabs } from "@/components/filter-tabs";
 import { Link } from "@/components/link";
-import {
-  ListView,
-  ListViewContent,
-  ListViewHeader,
-  ListViewTitle,
-  ListViewTitleBar,
-  ListViewToolbar,
-} from "@/components/list-view";
 import { MemberSelector } from "@/components/member-selector";
+import {
+  PageColumn,
+  PageContent,
+  PageHeader,
+  PageShell,
+  PageTitle,
+  PageToolbar,
+} from "@/components/page";
 import { RefreshOnFocus } from "@/components/refresh-on-focus";
 import { SearchInput } from "@/components/search-input";
 import type { Status } from "@/features/scheduled-event/schema";
@@ -193,43 +193,41 @@ export function EventsPage({
   );
 
   return (
-    <ListView>
+    <PageShell>
       <RefreshOnFocus />
-      <ListViewHeader>
-        <ListViewTitleBar>
-          <ListViewTitle>
+      <PageHeader>
+        <PageColumn>
+          <PageTitle>
             <Trans i18nKey="events" defaults="Events" />
-          </ListViewTitle>
-        </ListViewTitleBar>
-        <ListViewToolbar>
-          <FilterPills
-            param="status"
-            value={status}
-            label={t("eventsListStatusFilter", {
-              defaultValue: "Filter by status",
-            })}
-            options={[
-              {
-                value: "upcoming",
-                label: <Trans i18nKey="upcoming" defaults="Upcoming" />,
-              },
-              {
-                value: "past",
-                label: <Trans i18nKey="past" defaults="Past" />,
-              },
-              {
-                value: "canceled",
-                label: <Trans i18nKey="canceled" defaults="Canceled" />,
-              },
-            ]}
-            startTransition={startNavigation}
-          />
-          <div className="flex w-full items-center gap-2 sm:ml-auto sm:w-auto">
+          </PageTitle>
+          <PageToolbar className="pt-6">
             <SearchInput
-              className="w-auto min-w-0 flex-1 sm:w-56 sm:flex-none"
+              className="w-full min-w-0 sm:w-auto sm:min-w-48 sm:flex-1"
               placeholder={t("searchEventsPlaceholder", {
                 defaultValue: "Search events by title...",
               })}
+              startTransition={startNavigation}
+            />
+            <FilterTabs
+              param="status"
+              value={status}
+              label={t("eventsListStatusFilter", {
+                defaultValue: "Filter by status",
+              })}
+              options={[
+                {
+                  value: "upcoming",
+                  label: <Trans i18nKey="upcoming" defaults="Upcoming" />,
+                },
+                {
+                  value: "past",
+                  label: <Trans i18nKey="past" defaults="Past" />,
+                },
+                {
+                  value: "canceled",
+                  label: <Trans i18nKey="canceled" defaults="Canceled" />,
+                },
+              ]}
               startTransition={startNavigation}
             />
             {showMemberFilter ? (
@@ -239,19 +237,21 @@ export function EventsPage({
                 startTransition={startNavigation}
               />
             ) : null}
-          </div>
-        </ListViewToolbar>
-      </ListViewHeader>
-      <ListViewContent>
-        {isNavigating ? <EventsListSkeleton /> : list}
-        {isNavigating ? null : (
-          <EventsPagination
-            page={page}
-            hasNextPage={hasNextPage}
-            startTransition={startNavigation}
-          />
-        )}
-      </ListViewContent>
-    </ListView>
+          </PageToolbar>
+        </PageColumn>
+      </PageHeader>
+      <PageContent>
+        <PageColumn className="pb-8">
+          {isNavigating ? <EventsListSkeleton /> : list}
+          {isNavigating ? null : (
+            <EventsPagination
+              page={page}
+              hasNextPage={hasNextPage}
+              startTransition={startNavigation}
+            />
+          )}
+        </PageColumn>
+      </PageContent>
+    </PageShell>
   );
 }

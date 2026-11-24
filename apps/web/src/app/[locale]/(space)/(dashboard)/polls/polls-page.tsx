@@ -2,7 +2,7 @@
 
 import { buttonVariants } from "@rallly/ui";
 import { Button } from "@rallly/ui/button";
-import { CircleStopIcon, InboxIcon, PlusIcon } from "lucide-react";
+import { CircleStopIcon, InboxIcon } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import React from "react";
 import {
@@ -12,18 +12,18 @@ import {
   EmptyStateIcon,
   EmptyStateTitle,
 } from "@/components/empty-state";
-import { FilterPills } from "@/components/filter-pills";
+import { FilterTabs } from "@/components/filter-tabs";
 import { Link } from "@/components/link";
-import {
-  ListView,
-  ListViewActions,
-  ListViewContent,
-  ListViewHeader,
-  ListViewTitle,
-  ListViewTitleBar,
-  ListViewToolbar,
-} from "@/components/list-view";
 import { MemberSelector } from "@/components/member-selector";
+import {
+  PageActions,
+  PageColumn,
+  PageContent,
+  PageHeader,
+  PageShell,
+  PageTitle,
+  PageToolbar,
+} from "@/components/page";
 import { SearchInput } from "@/components/search-input";
 import { PollsListSkeleton } from "@/features/poll/components/polls-list";
 import { useSpace } from "@/features/space/client";
@@ -181,76 +181,86 @@ export function PollsPage({
   );
 
   return (
-    <ListView>
-      <ListViewHeader>
-        <ListViewTitleBar>
-          <ListViewTitle>
+    <PageShell>
+      <PageHeader>
+        <PageColumn>
+          <PageTitle>
             <Trans i18nKey="polls" defaults="Polls" />
-          </ListViewTitle>
-          <ListViewActions>
-            {usageMeter}
-            <Link
-              href="/new"
-              className={buttonVariants({ variant: "primary" })}
-            >
-              <PlusIcon data-icon="inline-start" />
-              <Trans i18nKey="createPoll" defaults="Create poll" />
-            </Link>
-          </ListViewActions>
-        </ListViewTitleBar>
-        <ListViewToolbar>
-          <FilterPills
-            param="status"
-            value={status}
-            label={t("pollsListStatusFilter", {
-              defaultValue: "Filter by status",
-            })}
-            options={[
-              {
-                value: "open",
-                label: <Trans i18nKey="pollStatusOpen" defaults="Open" />,
-              },
-              {
-                value: "closed",
-                label: <Trans i18nKey="pollStatusClosed" defaults="Closed" />,
-              },
-              {
-                value: "scheduled",
-                label: (
-                  <Trans i18nKey="pollStatusScheduled" defaults="Scheduled" />
-                ),
-              },
-            ]}
-            startTransition={startNavigation}
-          />
-          <div className="flex w-full items-center gap-2 sm:ml-auto sm:w-auto">
+          </PageTitle>
+          <PageToolbar className="pt-6">
+            {/* Below sm, search and the CTA share the first row and the
+                filters take the full second row whatever the width. */}
             <SearchInput
-              className="w-auto min-w-0 flex-1 sm:w-56 sm:flex-none"
+              className="min-w-40 flex-1 max-sm:order-first sm:min-w-48"
               placeholder={t("searchPollsPlaceholder", {
                 defaultValue: "Search polls by title...",
               })}
               startTransition={startNavigation}
             />
-            {showMemberFilter ? (
-              <MemberSelector
-                members={members}
-                className="min-w-0 sm:min-w-40"
+            <div className="flex min-w-0 items-center gap-2 max-sm:w-full">
+              <FilterTabs
+                param="status"
+                value={status}
+                label={t("pollsListStatusFilter", {
+                  defaultValue: "Filter by status",
+                })}
+                options={[
+                  {
+                    value: "open",
+                    label: <Trans i18nKey="pollStatusOpen" defaults="Open" />,
+                  },
+                  {
+                    value: "closed",
+                    label: (
+                      <Trans i18nKey="pollStatusClosed" defaults="Closed" />
+                    ),
+                  },
+                  {
+                    value: "scheduled",
+                    label: (
+                      <Trans
+                        i18nKey="pollStatusScheduled"
+                        defaults="Scheduled"
+                      />
+                    ),
+                  },
+                ]}
                 startTransition={startNavigation}
               />
-            ) : null}
-          </div>
-        </ListViewToolbar>
-      </ListViewHeader>
-      <ListViewContent>
-        {isNavigating ? <PollsListSkeleton /> : list}
-        {isNavigating ? null : (
-          <PollsPagination
-            page={page}
-            hasNextPage={hasNextPage}
-            startTransition={startNavigation}
-          />
-        )}
-      </ListViewContent>
-    </ListView>
+              {showMemberFilter ? (
+                <MemberSelector
+                  members={members}
+                  className="min-w-0 sm:min-w-40"
+                  startTransition={startNavigation}
+                />
+              ) : null}
+            </div>
+            <PageActions className="max-sm:order-first">
+              {usageMeter}
+              <Link
+                href="/new"
+                className={buttonVariants({
+                  variant: "primary",
+                })}
+              >
+                <Trans i18nKey="createPoll" defaults="Create poll" />
+              </Link>
+            </PageActions>
+          </PageToolbar>
+        </PageColumn>
+      </PageHeader>
+      <PageContent>
+        <PageColumn className="pb-8">
+          {isNavigating ? <PollsListSkeleton /> : list}
+          {isNavigating ? null : (
+            <PollsPagination
+              page={page}
+              hasNextPage={hasNextPage}
+              startTransition={startNavigation}
+            />
+          )}
+        </PageColumn>
+      </PageContent>
+    </PageShell>
   );
 }

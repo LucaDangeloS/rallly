@@ -7,7 +7,7 @@ import { LastUsedBadge } from "@/features/auth/components/last-used-badge";
 import { authClient } from "@/lib/auth-client";
 import { validateRedirectUrl } from "@/lib/utils/redirect";
 
-function SSOImage({ provider }: { provider: string }) {
+export function SSOImage({ provider }: { provider: string }) {
   if (provider === "google") {
     return (
       <Image
@@ -53,7 +53,6 @@ export function SSOProvider({
   return (
     <Button
       size="xl"
-      shape="rounded"
       className="relative"
       key={providerId}
       onClick={() => {
