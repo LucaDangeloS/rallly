@@ -1,7 +1,7 @@
 "use client";
 
 import { posthog } from "@rallly/posthog/client";
-import { buttonVariants, cn } from "@rallly/ui";
+import { buttonVariants, cn, passwordManagerIgnoreProps } from "@rallly/ui";
 import { Alert, AlertDescription } from "@rallly/ui/alert";
 import { Button } from "@rallly/ui/button";
 import {
@@ -57,6 +57,7 @@ import { getCityFromTimezoneId } from "@/components/time-zone-picker/timezone-da
 import { AddToCalendarButton } from "@/features/calendars/components/add-to-calendar-button";
 import { PollConferencingSummary } from "@/features/conferencing/components/poll-conferencing-summary";
 import TruncatedLinkify from "@/features/poll/components/truncated-linkify";
+import type { FailureDetail } from "@/features/poll/invite/client";
 import {
   ensureSession,
   runBallotAction,
@@ -703,7 +704,9 @@ export function AccessibleBallot({
     setSaveError(null);
     // So what this save announces reads as new, even with the same words.
     setStatus("");
-    let result: { ok: true } | { ok: false; reason: string };
+    let result:
+      | { ok: true }
+      | { ok: false; reason: string; detail?: FailureDetail };
     if (isNew) {
       const session = await ensureSession();
       result = session.ok
@@ -725,7 +728,11 @@ export function AccessibleBallot({
         ? await runBallotAction(() =>
             updateParticipantVotesAction({ participantId, votes, token }),
           )
-        : { ok: false, reason: "unknown" };
+        : {
+            ok: false,
+            reason: "unknown",
+            detail: { cause: "no_active_response" },
+          };
       if (result.ok) state.markSaved();
     }
     setPending(false);
@@ -733,6 +740,8 @@ export function AccessibleBallot({
       capture("poll_vote:save_error", {
         reason: result.reason,
         is_new: isNew,
+        online: navigator.onLine,
+        ...result.detail,
       });
       fail([], errorMessage(result.reason));
       return;
@@ -906,6 +915,7 @@ export function AccessibleBallot({
                 required
                 maxLength={100}
                 autoComplete="name"
+                {...passwordManagerIgnoreProps}
                 defaultValue={active.name}
               />
             </Field>
@@ -1141,7 +1151,7 @@ export function AccessibleBallot({
         // 2px is the card's border.
         "lg:flex-none",
         compactCard
-          ? "lg:h-[min(27rem,calc(100dvh-8rem-2px))] lg:w-auto lg:grid-cols-[20rem_28rem] xl:grid-cols-[24rem_28rem]"
+          ? "lg:h-[min(31rem,calc(100dvh-8rem-2px))] lg:w-auto lg:grid-cols-[20rem_28rem] xl:grid-cols-[24rem_28rem]"
           : "lg:h-[min(calc(100dvh-8rem-2px),calc(min(100vw-2rem,64rem)*0.75))] lg:w-[calc(100vw-2rem)] lg:max-w-5xl lg:grid-cols-[20rem_minmax(0,1fr)] xl:grid-cols-[24rem_minmax(0,1fr)]",
         compactOnPhone ? "max-lg:gap-y-4" : "max-lg:gap-y-6",
         // Below lg the title sits in the header, so the description that
@@ -1824,6 +1834,7 @@ export function AccessibleBallot({
                     required
                     maxLength={100}
                     autoComplete="name"
+                    {...passwordManagerIgnoreProps}
                     defaultValue={defaultName}
                     className="scroll-mt-6"
                     aria-invalid={errorFor("name") ? true : undefined}
@@ -1860,6 +1871,7 @@ export function AccessibleBallot({
                       type="email"
                       required={ballot.requireParticipantEmail}
                       autoComplete="email"
+                      {...passwordManagerIgnoreProps}
                       defaultValue={defaultEmail}
                       className="scroll-mt-6"
                       aria-invalid={errorFor("email") ? true : undefined}
@@ -1960,6 +1972,7 @@ export function AccessibleBallot({
                         autoFocus
                         name="note"
                         maxLength={MAX_RESPONSE_NOTE_LENGTH}
+                        {...passwordManagerIgnoreProps}
                       />
                       <InputGroupAddon
                         align="inline-end"
@@ -2027,7 +2040,7 @@ export function AccessibleBallot({
                 className={cn(
                   "flex flex-col gap-2",
                   onDetailsStep
-                    ? // The card is short, so a note can push this past its foot.
+                    ? // The card fits an empty note, so a long one can push this past its foot.
                       "pt-6 lg:sticky lg:bottom-0 lg:z-20 lg:mt-auto lg:bg-card/70 lg:pb-6 lg:backdrop-blur-md"
                     : "sticky bottom-0 z-20 mt-6 bg-card/70 py-3 backdrop-blur-md max-lg:-mx-4 max-lg:px-4 lg:-mx-8 lg:px-8",
                   // For a saved response it arrives with the first change, so it
